@@ -2,22 +2,25 @@
 
 ## Phase 1: Windows 11 proof of concept
 
-The initial executable runs locally on a Windows 11 laptop. Unreal Engine owns
-rendering and the off-axis projection. A webcam supplies the single-viewer head
-pose. The first implementation must remain fully usable without MetaHuman,
-cloud speech services or special display hardware.
+The initial proof of concept runs in a current browser on a Windows 11 laptop.
+Three.js owns rendering and the off-axis projection. MediaPipe processes the
+integrated webcam and supplies a single-viewer eye-position estimate. The first
+implementation remains fully usable in a mouse simulation mode and without
+MetaHuman, cloud speech services or special display hardware.
 
 Initial development environment:
 
-- Unreal Engine with Windows and Android target support;
-- Visual Studio with the Unreal/C++ workload;
-- Git and Git LFS;
-- a webcam capable of stable 60 fps capture where possible;
+- Microsoft Edge or Google Chrome;
+- Node.js 20.19 or newer for the local development server;
+- Git;
+- a webcam capable of stable 30 fps capture;
 - a normal laptop display or an external monitor.
 
-The first performance budget is 60 rendered frames per second. Tracking,
-filtering and rendering latency must be measured separately before adding the
-avatar and conversation pipeline.
+The first performance budget is 60 rendered frames per second and 20–30
+tracking updates per second. Tracking, filtering and rendering latency must be
+measured separately before adding the production avatar and conversation
+pipeline. Unreal Engine, Visual Studio and Git LFS are introduced only if the
+high-fidelity rendering path is selected after the browser PoC.
 
 ## Phase 2: portable target evaluation
 

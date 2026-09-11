@@ -23,6 +23,7 @@ Thumbs.db
 !.env.example
 
 # Build and test output
+node_modules/
 build/
 dist/
 coverage/

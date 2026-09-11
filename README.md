@@ -19,6 +19,7 @@ The target concept combines:
 - `docs/` — architecture and analysis notes for the new project.
 - `reference/TheParallaxView/` — original Unity/iOS reference project by
   ALGOMYSTIC AB / Peder Norrby.
+- `web/` — Windows 11 browser PoC using a normal webcam, MediaPipe and Three.js.
 - `avatar/` — reserved for the future Unreal Engine prototype.
 
 The reference repository is kept separate so that its history and upstream
@@ -35,6 +36,10 @@ into the virtual room.
 
 MetaHuman, voice and AI integration should follow only after projection,
 tracking stability and latency have been validated.
+
+The first runnable implementation is the [web prototype](web/README.md). It
+provides mouse simulation, webcam tracking, display calibration and a
+lightweight proxy avatar for testing on older Windows hardware.
 
 See [docs/the-parallax-view-analysis.md](docs/the-parallax-view-analysis.md)
 and [docs/architecture.md](docs/architecture.md). The platform split and

@@ -9,9 +9,10 @@
    display coordinate system.
 4. **Pose filter and predictor** suppresses jitter and compensates part of the
    camera/render/display latency.
-5. **Off-axis projection component** calculates the Unreal view and projection
-   from the eye position and calibrated screen corners.
-6. **Unreal renderer** draws the room and avatar for that viewpoint.
+5. **Off-axis projection component** calculates the view and projection from
+   the eye position and calibrated screen corners.
+6. **Renderer adapter** draws the room and avatar for that viewpoint. The first
+   implementation uses Three.js; Unreal remains the later high-fidelity path.
 7. **Avatar behavior** uses the tracked viewer position as its gaze target.
 8. **Conversation pipeline** later adds microphone input, speech recognition,
    an LLM, speech synthesis and audio-driven facial animation.
@@ -20,15 +21,17 @@
 
 | Stage | Scope | Exit criterion |
 |---|---|---|
-| 0 — Geometry test | Mouse-controlled eye point, grid room, normal monitor | Perspective remains geometrically plausible across the intended viewing box |
-| 1 — Webcam tracking | One face, estimated 3D head pose, filtering and calibration UI | Stable illusion at 60 fps with acceptable jitter and latency |
-| 2 — Avatar | MetaHuman or lightweight placeholder, lighting and gaze target | Avatar appears consistently located behind the display plane |
+| 0 — Web geometry test | Three.js, mouse-controlled eye point, grid room, normal monitor | Perspective remains geometrically plausible across the intended viewing box |
+| 1 — Web webcam tracking | MediaPipe, one face, estimated 3D eye pose, filtering and calibration UI | Stable illusion at 60 fps with acceptable jitter and latency |
+| 2 — Avatar | Lightweight web avatar, followed by a decision on MetaHuman/Unreal | Avatar appears consistently located behind the display plane |
 | 3 — Better tracking | Depth/IR tracker if webcam accuracy is insufficient | Reliable X/Y/Z over the required distance and lighting range |
 | 4 — Conversation | STT, LLM, streaming TTS, lip sync and interruption handling | Natural turn-taking with measured end-to-end response latency |
 
 ## Early design decisions
 
 - Use a Windows 11 laptop as the first proof-of-concept platform.
+- Run the first proof of concept in a current browser so the display geometry
+  and ordinary-webcam tracking can be evaluated before installing Unreal.
 - Target one viewer; multi-viewer support is out of scope for a normal display.
 - Start monoscopic and without glasses.
 - Keep tracking behind an interface so webcam, TrueDepth and dedicated tracker
