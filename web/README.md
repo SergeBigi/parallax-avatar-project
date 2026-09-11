@@ -34,7 +34,8 @@ illusion before a production avatar is introduced.
    npm run dev
    ```
 
-3. Open `http://127.0.0.1:5173` if the browser does not open it automatically.
+3. The browser opens `http://127.0.0.1:5173` automatically. Keep the command
+   window open while using the prototype.
 4. Test the projection with the mouse first. The mouse wheel changes the
    simulated viewing distance.
 5. Select **Webcam starten**, grant camera access, then disable mouse
