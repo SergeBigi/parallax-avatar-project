@@ -1,0 +1,3 @@
+[submodule "reference/TheParallaxView"]
+	path = reference/TheParallaxView
+	url = https://github.com/algomystic/TheParallaxView.git
