@@ -2,6 +2,10 @@
 
 Prototype for a glasses-free depth illusion with a real-time 3D avatar.
 
+The first proof of concept targets a Windows 11 laptop with a normal display
+and webcam. A later productization stage will evaluate a native tablet build or
+a thin client for a smart display such as an Echo Show.
+
 The target concept combines:
 
 - head or eye-position tracking;
@@ -33,4 +37,6 @@ MetaHuman, voice and AI integration should follow only after projection,
 tracking stability and latency have been validated.
 
 See [docs/the-parallax-view-analysis.md](docs/the-parallax-view-analysis.md)
-and [docs/architecture.md](docs/architecture.md).
+and [docs/architecture.md](docs/architecture.md). The platform split and
+portability constraints are described in
+[docs/platform-strategy.md](docs/platform-strategy.md).

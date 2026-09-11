@@ -28,10 +28,16 @@
 
 ## Early design decisions
 
+- Use a Windows 11 laptop as the first proof-of-concept platform.
 - Target one viewer; multi-viewer support is out of scope for a normal display.
 - Start monoscopic and without glasses.
 - Keep tracking behind an interface so webcam, TrueDepth and dedicated tracker
   implementations can be exchanged.
+- Keep the projection kernel and calibration model independent of Unreal scene
+  content so that a later tablet implementation can reuse the same geometry.
+- Treat tablet and Echo Show deployment as separate paths. The Echo Show path
+  requires an explicit feasibility check for camera/head-pose access and
+  end-to-end streaming latency.
 - Store all physical dimensions in metres and document coordinate conventions.
 - Separate display calibration from personal eye/IPD calibration.
 - Provide diagnostic overlays for the screen plane, tracked eye, raw/filtered
