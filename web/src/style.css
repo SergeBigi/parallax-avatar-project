@@ -212,6 +212,31 @@ input:focus-visible {
   gap: 1rem;
 }
 
+.scene-picker {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+.scene-picker select {
+  width: 100%;
+  padding: 0.6rem;
+  color: #edf5fa;
+  background: #152333;
+  border: 1px solid #405267;
+  border-radius: 0.5rem;
+  font: inherit;
+}
+
+.scene-credit {
+  color: #93a4b8;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.scene-credit a { color: #93cfc4; }
+
 .eyebrow {
   color: #67dfc7;
   font-size: 0.75rem;

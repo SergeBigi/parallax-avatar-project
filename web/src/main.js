@@ -20,6 +20,7 @@ const elements = {
   mouseMode: document.querySelector("#mouse-mode"),
   mirrorX: document.querySelector("#mirror-x"),
   mirrorZ: document.querySelector("#mirror-z"),
+  sceneSelect: document.querySelector("#scene-select"),
   panelToggle: document.querySelector("#panel-toggle"),
   panelContent: document.querySelector("#panel-content"),
   trackingStatus: document.querySelector("#tracking-status"),
@@ -131,6 +132,11 @@ elements.panelToggle.addEventListener("click", () => {
 renderer.setAnimationLoop(renderFrame);
 
 function bindControls() {
+  sceneController.setMode(elements.sceneSelect.value);
+  elements.sceneSelect.addEventListener("change", () => {
+    sceneController.setMode(elements.sceneSelect.value);
+    saveSettings();
+  });
   Object.values(controls).forEach((control) => {
     const renderValue = () => {
       control.output.value = `${control.input.value}${control.suffix}`;
@@ -168,6 +174,7 @@ function saveSettings() {
   );
   values.mirrorX = elements.mirrorX.checked;
   values.mirrorZ = elements.mirrorZ.checked;
+  values.scene = elements.sceneSelect.value;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(values));
 }
 
@@ -185,6 +192,7 @@ function loadSettings() {
   });
   elements.mirrorX.checked = saved.mirrorX ?? true;
   elements.mirrorZ.checked = saved.mirrorZ ?? true;
+  elements.sceneSelect.value = saved.scene === "avatar" ? "avatar" : "bars";
 }
 
 async function startWebcamTracking() {
@@ -337,7 +345,7 @@ function renderFrame(now) {
   );
   camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
 
-  sceneController.update(now / 1000);
+  sceneController.update(now / 1000, calibration);
   renderer.render(scene, camera);
   updateMetrics(eye);
   updateFps(now);

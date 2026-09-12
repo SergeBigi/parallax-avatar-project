@@ -1,99 +1,110 @@
 import * as THREE from "three";
+import { createAvatarScene } from "./avatarScene.js";
+
+// Original BoxScene / GridBox / Boxes, in Unity scene order.
+// Coordinates in metres; GridBox and Boxes scales cancel each other.
+// Source and art attribution: ../THIRD_PARTY_NOTICES.md.
+const BOXES = [
+  [-0.0667, -0.0106, 0.06, 0.005, 0.005, 0.15],
+  [-0.08, -0.0141, 0.0303, 0.005, 0.005, 0.1],
+  [-0.0696, 0, 0.0146, 0.001, 0.01, 0.1],
+  [-0.0691, -0.0059, -0.0304, 0.05, 0.05, 0.01],
+  [-0.0705, -0.0046, -0.02, 0.03, 0.03, 0.03],
+  [-0.0772, -0.0125, -0.02, 0.02, 0.02, 0.05],
+  [-0.0705, 0.001, -0.02, 0.02, 0.02, 0.04],
+  [-0.0675, -0.0089, 0.0001, 0.01, 0.01, 0.1],
+  [-0.0691, 0.0032, 0.0001, 0.01, 0.01, 0.05],
+  [-0.072, -0.0209, 0.0092, 0.001, 0.01, 0.03],
+  [-0.0869, -0.0019, -0.0286, 0.01, 0.01, 0.05],
+  [-0.0535, -0.0019, -0.0286, 0.01, 0.01, 0.05],
+  [-0.0581, -0.0111, -0.0359, 0.01, 0.01, 0.05],
+];
 
 export function createParallaxScene(scene) {
-  scene.background = new THREE.Color(0x070a10);
-  scene.fog = new THREE.Fog(0x070a10, 2.4, 5.5);
+  const avatarScene = new THREE.Scene();
+  const avatar = createAvatarScene(avatarScene);
+  const boxScene = new THREE.Scene();
+  const box = createBoxScene(boxScene);
+  scene.add(boxScene, avatarScene);
+  let mode = "bars";
 
-  scene.add(new THREE.HemisphereLight(0xb6d6ff, 0x11131b, 1.35));
-
-  const keyLight = new THREE.DirectionalLight(0xd7eaff, 3.2);
-  keyLight.position.set(-0.6, 1.4, 0.6);
-  scene.add(keyLight);
-
-  const accentLight = new THREE.PointLight(0x4de1c1, 8, 2.2, 2);
-  accentLight.position.set(0.6, 0.1, -0.25);
-  scene.add(accentLight);
-
-  const floor = new THREE.GridHelper(3.6, 30, 0x2dd8bd, 0x213246);
-  floor.position.set(0, -0.48, -1.35);
-  scene.add(floor);
-
-  const backWall = new THREE.Mesh(
-    new THREE.PlaneGeometry(3.2, 2.2, 12, 8),
-    new THREE.MeshBasicMaterial({ color: 0x0c1421, wireframe: true, transparent: true, opacity: 0.55 }),
-  );
-  backWall.position.set(0, 0.35, -2.1);
-  scene.add(backWall);
-
-  const depthMaterial = new THREE.MeshStandardMaterial({
-    color: 0x233854,
-    roughness: 0.58,
-    metalness: 0.18,
-  });
-
-  [
-    [-0.72, -0.28, -0.55, 0.17],
-    [0.72, -0.2, -1.15, 0.24],
-    [-0.92, -0.08, -1.72, 0.31],
-  ].forEach(([x, y, z, size]) => {
-    const marker = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), depthMaterial);
-    marker.position.set(x, y, z);
-    marker.rotation.set(0.2, 0.45, 0.08);
-    scene.add(marker);
-  });
-
-  const avatar = new THREE.Group();
-  const bodyMaterial = new THREE.MeshStandardMaterial({
-    color: 0x172c43,
-    roughness: 0.42,
-    metalness: 0.08,
-  });
-  const skinMaterial = new THREE.MeshStandardMaterial({
-    color: 0x83a8bd,
-    roughness: 0.7,
-  });
-  const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x9fffea });
-
-  const shoulders = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.42, 6, 14), bodyMaterial);
-  shoulders.scale.set(1.35, 1, 0.68);
-  shoulders.position.y = -0.3;
-  avatar.add(shoulders);
-
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.1, 0.16, 16), skinMaterial);
-  neck.position.y = 0.04;
-  avatar.add(neck);
-
-  const head = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.12, 8, 18), skinMaterial);
-  head.scale.set(0.82, 1.05, 0.88);
-  head.position.y = 0.25;
-  avatar.add(head);
-
-  [-0.055, 0.055].forEach((x) => {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.012, 12, 8), eyeMaterial);
-    eye.position.set(x, 0.28, 0.132);
-    avatar.add(eye);
-  });
-
-  avatar.position.set(0, 0, -0.9);
-  scene.add(avatar);
-
-  const frameGeometry = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(-0.42, -0.28, -0.42),
-    new THREE.Vector3(-0.42, 0.5, -0.42),
-    new THREE.Vector3(0.42, 0.5, -0.42),
-    new THREE.Vector3(0.42, -0.28, -0.42),
-    new THREE.Vector3(-0.42, -0.28, -0.42),
-  ]);
-  const portal = new THREE.Line(
-    frameGeometry,
-    new THREE.LineBasicMaterial({ color: 0xf0a55a, transparent: true, opacity: 0.8 }),
-  );
-  scene.add(portal);
-
+  function setMode(value) {
+    mode = value === "avatar" ? "avatar" : "bars";
+    boxScene.visible = mode === "bars";
+    avatarScene.visible = mode === "avatar";
+    scene.background = mode === "bars" ? new THREE.Color(0x151515) : avatarScene.background;
+    scene.fog = mode === "bars" ? null : avatarScene.fog;
+  }
+  setMode(mode);
   return {
-    update(elapsedSeconds) {
-      avatar.position.y = Math.sin(elapsedSeconds * 1.25) * 0.006;
-      accentLight.intensity = 7.5 + Math.sin(elapsedSeconds * 1.8) * 0.7;
+    setMode,
+    update(elapsedSeconds, calibration) {
+      if (mode === "avatar") avatar.update(elapsedSeconds);
+      else box.update(calibration);
     },
   };
+}
+
+function createBoxScene(scene) {
+  const room = new THREE.Group();
+  room.name = "Original Box Scene";
+  scene.add(room);
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  const materials = [0xffffff, 0xeeeeee, 0xf9f9f9].map(
+    (color) => new THREE.MeshLambertMaterial({ color }),
+  );
+  BOXES.forEach(([x, y, z, width, height, depth], index) => {
+    const material = index === 3 ? materials[2] : [4, 5].includes(index) ? materials[1] : materials[0];
+    const bar = new THREE.Mesh(geometry, material);
+    bar.name = `Original bar ${index + 1}`;
+    // Unity's phone screen extends from x=-0.1347 to x=0.
+    // Centre it on the browser's screen plane.
+    bar.position.set(x + 0.06735, y + 0.009, z);
+    bar.scale.set(width, height, depth);
+    room.add(bar);
+  });
+
+  const loader = new THREE.TextureLoader();
+  function wallTexture(name, rotate = false) {
+    const texture = loader.load(`${import.meta.env.BASE_URL}scenes/box/${name}.jpg`);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    if (rotate) {
+      texture.center.set(0.5, 0.5);
+      texture.rotation = Math.PI / 2;
+    }
+    return new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+  }
+  const back = wallTexture("box_back", true);
+  const side = wallTexture("box_side");
+  const top = wallTexture("box_top");
+  function wall(name, width, height, position, rotation, material) {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
+    mesh.name = name;
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    room.add(mesh);
+  }
+  // Five original grid walls, opening at z=0 and back at z=-0.0312.
+  wall("Back", 0.1347, 0.062, [0, 0, -0.0312], [0, 0, 0], back);
+  wall("Left", 0.0312, 0.062, [-0.06735, 0, -0.0156], [0, Math.PI / 2, 0], side);
+  wall("Right", 0.0312, 0.062, [0.06735, 0, -0.0156], [0, -Math.PI / 2, 0], side);
+  wall("Floor", 0.1347, 0.0312, [0, -0.031, -0.0156], [-Math.PI / 2, 0, 0], top);
+  wall("Ceiling", 0.1347, 0.0312, [0, 0.031, -0.0156], [Math.PI / 2, 0, 0], top);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+  const key = new THREE.DirectionalLight(0xffffff, 2.1);
+  key.position.set(-0.4, 0.8, 1);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.45);
+  fill.position.set(0.6, -0.2, 0.5);
+  scene.add(fill);
+
+  function update({ screenWidth = 0.286, screenHeight = 0.191 } = {}) {
+    // Fit the opening to the calibrated display. Keep depth independent of
+    // display size: the foremost bar ends at 20.25 cm, safely before the
+    // closest tracked eye position (25 cm, near plane 1 cm).
+    room.scale.set(screenWidth / 0.1347, screenHeight / 0.062, 1.5);
+  }
+  update();
+  return { update };
 }
