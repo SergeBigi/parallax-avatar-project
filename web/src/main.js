@@ -9,6 +9,7 @@ const WASM_PATH = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAP
 const MODEL_PATH =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task";
 const SETTINGS_KEY = "parallax-view-calibration-v1";
+const DEPTH_INVERSION_REFERENCE_METERS = 0.65;
 
 const elements = {
   viewport: document.querySelector("#viewport"),
@@ -279,6 +280,13 @@ function updateTracking(now) {
     });
 
     if (estimatedPose) {
+      // Reverse only the tracked depth response around the default viewing
+      // distance. Moving closer now enlarges the scene; moving away shrinks it.
+      estimatedPose.z = THREE.MathUtils.clamp(
+        (DEPTH_INVERSION_REFERENCE_METERS ** 2) / estimatedPose.z,
+        0.25,
+        2.5,
+      );
       targetPose = estimatedPose;
       trackedFrames += 1;
       setTrackingStatus("Webcam-Tracking");
