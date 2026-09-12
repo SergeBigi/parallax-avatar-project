@@ -21,7 +21,8 @@ body,
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -62,6 +63,7 @@ button {
 
 .brand,
 .actions,
+.scene-picker,
 .panel,
 .fullscreen-note {
   pointer-events: auto;
@@ -215,8 +217,15 @@ input:focus-visible {
 .scene-picker {
   display: grid;
   gap: 0.4rem;
-  margin-top: 1rem;
+  width: min(18rem, 28vw);
+  margin-right: auto;
   font-size: 0.85rem;
+}
+
+.scene-picker > span {
+  color: #b9c8d6;
+  font-size: 0.7rem;
+  text-shadow: 0 1px 5px #070a10;
 }
 
 .scene-picker select {
@@ -227,6 +236,12 @@ input:focus-visible {
   border: 1px solid #405267;
   border-radius: 0.5rem;
   font: inherit;
+  cursor: pointer;
+}
+
+.scene-picker select:focus-visible {
+  outline: 3px solid rgb(109 241 212 / 65%);
+  outline-offset: 2px;
 }
 
 .scene-credit {
@@ -236,6 +251,14 @@ input:focus-visible {
 }
 
 .scene-credit a { color: #93cfc4; }
+
+#room-controls {
+  margin-bottom: 0.8rem;
+  padding: 0.8rem;
+  border: 1px solid rgb(109 241 212 / 20%);
+  border-radius: 0.65rem;
+  background: rgb(109 241 212 / 4%);
+}
 
 .eyebrow {
   color: #67dfc7;
@@ -427,6 +450,24 @@ input[type="range"] {
 
 [hidden] {
   display: none !important;
+}
+
+@media (max-width: 980px) {
+  .topbar {
+    flex-wrap: wrap;
+  }
+
+  .scene-picker {
+    order: 3;
+    width: 100%;
+    margin: 0;
+    gap: 0.2rem;
+  }
+
+  .panel {
+    top: 9.5rem;
+    max-height: calc(100vh - 11rem);
+  }
 }
 
 @media (max-width: 760px) {

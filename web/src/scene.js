@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createAvatarScene } from "./avatarScene.js";
+import { createRoomScene } from "./roomScene.js";
 
 // Original BoxScene / GridBox / Boxes, in Unity scene order.
 // Coordinates in metres; GridBox and Boxes scales cancel each other.
@@ -21,26 +21,39 @@ const BOXES = [
 ];
 
 export function createParallaxScene(scene) {
-  const avatarScene = new THREE.Scene();
-  const avatar = createAvatarScene(avatarScene);
+  const roomScene = new THREE.Scene();
+  const room = createRoomScene(roomScene);
   const boxScene = new THREE.Scene();
+  boxScene.name = "Original bars scene";
   const box = createBoxScene(boxScene);
-  scene.add(boxScene, avatarScene);
+  scene.add(boxScene, roomScene);
   let mode = "bars";
+  let shadowsDirty = true;
 
   function setMode(value) {
-    mode = value === "avatar" ? "avatar" : "bars";
+    // Migrate the previous prototype avatar selection to the full-body doll.
+    if (value === "avatar") value = "room-doll";
+    mode = ["room", "room-doll"].includes(value) ? value : "bars";
     boxScene.visible = mode === "bars";
-    avatarScene.visible = mode === "avatar";
-    scene.background = mode === "bars" ? new THREE.Color(0x151515) : avatarScene.background;
-    scene.fog = mode === "bars" ? null : avatarScene.fog;
+    roomScene.visible = mode !== "bars";
+    room.setDollVisible(mode === "room-doll");
+    scene.background = mode === "bars" ? new THREE.Color(0x151515) : roomScene.background;
+    scene.fog = null;
+    shadowsDirty = true;
+    return mode;
   }
   setMode(mode);
   return {
     setMode,
-    update(elapsedSeconds, calibration) {
-      if (mode === "avatar") avatar.update(elapsedSeconds);
-      else box.update(calibration);
+    update(calibration) {
+      let layoutChanged = false;
+      if (mode === "bars") box.update(calibration);
+      else layoutChanged = room.update(calibration);
+      // All objects and lights are stationary: only refresh shadows on scene
+      // or layout changes, not on every tracked head movement.
+      const refreshShadows = shadowsDirty || layoutChanged;
+      shadowsDirty = false;
+      return refreshShadows;
     },
   };
 }

@@ -21,6 +21,9 @@ const elements = {
   mirrorX: document.querySelector("#mirror-x"),
   mirrorZ: document.querySelector("#mirror-z"),
   sceneSelect: document.querySelector("#scene-select"),
+  sceneDescription: document.querySelector("#scene-description"),
+  sceneCredit: document.querySelector("#scene-credit"),
+  roomControls: document.querySelector("#room-controls"),
   panelToggle: document.querySelector("#panel-toggle"),
   panelContent: document.querySelector("#panel-content"),
   trackingStatus: document.querySelector("#tracking-status"),
@@ -39,6 +42,7 @@ const controlDefinitions = {
   ipd: { input: "ipd", output: "ipd-output", suffix: " mm", fallback: 64 },
   fov: { input: "fov", output: "fov-output", suffix: "°", fallback: 60 },
   smoothing: { input: "smoothing", output: "smoothing-output", suffix: " ms", fallback: 90 },
+  roomDepth: { input: "room-depth", output: "room-depth-output", suffix: " cm", fallback: 45 },
 };
 
 const controls = Object.fromEntries(
@@ -59,6 +63,9 @@ const renderer = new THREE.WebGLRenderer({
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.autoUpdate = false;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 10);
@@ -87,10 +94,10 @@ const resizeObserver = new ResizeObserver(resizeRenderer);
 resizeObserver.observe(elements.viewport);
 
 elements.viewport.addEventListener("pointermove", (event) => {
-  if (!elements.mouseMode.checked) return;
+  if (!elements.mouseMode.checked || event.target !== elements.canvas) return;
   const rect = elements.viewport.getBoundingClientRect();
-  const nx = event.clientX / rect.width - 0.5;
-  const ny = event.clientY / rect.height - 0.5;
+  const nx = (event.clientX - rect.left) / rect.width - 0.5;
+  const ny = (event.clientY - rect.top) / rect.height - 0.5;
   targetPose = {
     x: nx * 0.42,
     y: -ny * 0.25,
@@ -101,7 +108,7 @@ elements.viewport.addEventListener("pointermove", (event) => {
 elements.viewport.addEventListener(
   "wheel",
   (event) => {
-    if (!elements.mouseMode.checked) return;
+    if (!elements.mouseMode.checked || event.target !== elements.canvas) return;
     event.preventDefault();
     targetPose.z = THREE.MathUtils.clamp(targetPose.z + event.deltaY * 0.0005, 0.3, 1.5);
   },
@@ -132,9 +139,9 @@ elements.panelToggle.addEventListener("click", () => {
 renderer.setAnimationLoop(renderFrame);
 
 function bindControls() {
-  sceneController.setMode(elements.sceneSelect.value);
+  applySceneSelection();
   elements.sceneSelect.addEventListener("change", () => {
-    sceneController.setMode(elements.sceneSelect.value);
+    applySceneSelection();
     saveSettings();
   });
   Object.values(controls).forEach((control) => {
@@ -155,6 +162,14 @@ function bindControls() {
   elements.mirrorZ.addEventListener("change", saveSettings);
 }
 
+function applySceneSelection() {
+  const mode = sceneController.setMode(elements.sceneSelect.value);
+  elements.sceneSelect.value = mode;
+  elements.sceneDescription.textContent = elements.sceneSelect.selectedOptions[0].dataset.description;
+  elements.sceneCredit.hidden = mode !== "bars";
+  elements.roomControls.hidden = mode === "bars";
+}
+
 function readCalibration() {
   return {
     screenWidth: Number(controls.screenWidth.input.value) / 1000,
@@ -163,6 +178,7 @@ function readCalibration() {
     ipdMeters: Number(controls.ipd.input.value) / 1000,
     horizontalFovDegrees: Number(controls.fov.input.value),
     smoothingSeconds: Number(controls.smoothing.input.value) / 1000,
+    roomDepth: Number(controls.roomDepth.input.value) / 100,
     mirrorX: elements.mirrorX.checked,
     mirrorZ: elements.mirrorZ.checked,
   };
@@ -175,13 +191,18 @@ function saveSettings() {
   values.mirrorX = elements.mirrorX.checked;
   values.mirrorZ = elements.mirrorZ.checked;
   values.scene = elements.sceneSelect.value;
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(values));
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(values));
+  } catch {
+    // Scene switching and calibration also work when browser storage is blocked.
+  }
 }
 
 function loadSettings() {
   let saved = {};
   try {
     saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}");
+    if (!saved || typeof saved !== "object" || Array.isArray(saved)) saved = {};
   } catch {
     saved = {};
   }
@@ -192,7 +213,8 @@ function loadSettings() {
   });
   elements.mirrorX.checked = saved.mirrorX ?? true;
   elements.mirrorZ.checked = saved.mirrorZ ?? true;
-  elements.sceneSelect.value = saved.scene === "avatar" ? "avatar" : "bars";
+  const savedScene = saved.scene === "avatar" ? "room-doll" : saved.scene;
+  elements.sceneSelect.value = ["bars", "room", "room-doll"].includes(savedScene) ? savedScene : "bars";
 }
 
 async function startWebcamTracking() {
@@ -345,7 +367,7 @@ function renderFrame(now) {
   );
   camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
 
-  sceneController.update(now / 1000, calibration);
+  if (sceneController.update(calibration)) renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, camera);
   updateMetrics(eye);
   updateFps(now);

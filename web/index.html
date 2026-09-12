@@ -23,6 +23,15 @@
           </div>
         </div>
 
+        <label class="scene-picker" for="scene-select">
+          <span>Szene</span>
+          <select id="scene-select" aria-describedby="scene-description">
+            <option value="bars" data-description="Die originalen Balken vor dem Gitterraum.">Balken (Original)</option>
+            <option value="room" data-description="Ein offener 3D-Raum. Bodenraster und Wandrahmen machen die Tiefe sichtbar.">3D-Raum</option>
+            <option value="room-doll" data-description="Eine kleine Holzpuppe steht im Raum. Bewege deinen Kopf seitlich und nach oben, um sie aus verschiedenen Blickwinkeln zu sehen.">3D-Raum mit Puppe</option>
+          </select>
+        </label>
+
         <div class="actions">
           <div class="status-chip" id="tracking-status" role="status">
             <span class="status-dot"></span>
@@ -56,21 +65,22 @@
         </div>
 
         <div id="panel-content">
-          <label class="scene-picker" for="scene-select">
-            <span>Szene</span>
-            <select id="scene-select">
-              <option value="bars">Original – Balken und Gitterraum</option>
-              <option value="avatar">Avatar</option>
-            </select>
-          </label>
-          <p class="scene-credit">
+          <p class="hint" id="scene-description" aria-live="polite"></p>
+          <p class="scene-credit" id="scene-credit">
             Box Scene © 2018 ALGOMYSTIC AB / Peder Norrby ·
             <a href="https://github.com/algomystic/TheParallaxView" target="_blank" rel="noopener noreferrer">Original (CC BY-NC)</a>
           </p>
           <p class="hint">
             Bewege im Mausmodus den Zeiger. Starte danach die Webcam und bewege
-            deinen Kopf langsam seitlich.
+            deinen Kopf langsam seitlich. Mit dem Mausrad simulierst du den Abstand.
           </p>
+
+          <div class="control-list" id="room-controls" hidden>
+            <label for="room-depth">
+              <span>Raumtiefe <output id="room-depth-output">45 cm</output></span>
+              <input id="room-depth" type="range" min="15" max="100" step="5" value="45" />
+            </label>
+          </div>
 
           <div class="metrics" aria-label="Ermittelte Augenposition">
             <div><span>X</span><strong id="metric-x">0 mm</strong></div>
