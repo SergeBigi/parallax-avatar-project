@@ -42,9 +42,9 @@ const controls = Object.fromEntries(
   Object.entries(controlDefinitions).map(([key, definition]) => [
     key,
     {
+      ...definition,
       input: document.querySelector(`#${definition.input}`),
       output: document.querySelector(`#${definition.output}`),
-      ...definition,
     },
   ]),
 );
