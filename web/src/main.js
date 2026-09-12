@@ -19,6 +19,7 @@ const elements = {
   fullscreenNote: document.querySelector("#fullscreen-note"),
   mouseMode: document.querySelector("#mouse-mode"),
   mirrorX: document.querySelector("#mirror-x"),
+  mirrorZ: document.querySelector("#mirror-z"),
   panelToggle: document.querySelector("#panel-toggle"),
   panelContent: document.querySelector("#panel-content"),
   trackingStatus: document.querySelector("#tracking-status"),
@@ -145,6 +146,7 @@ function bindControls() {
     setTrackingStatus(elements.mouseMode.checked ? "Mausmodus" : cameraStream ? "Webcam aktiv" : "Webcam aus");
   });
   elements.mirrorX.addEventListener("change", saveSettings);
+  elements.mirrorZ.addEventListener("change", saveSettings);
 }
 
 function readCalibration() {
@@ -156,6 +158,7 @@ function readCalibration() {
     horizontalFovDegrees: Number(controls.fov.input.value),
     smoothingSeconds: Number(controls.smoothing.input.value) / 1000,
     mirrorX: elements.mirrorX.checked,
+    mirrorZ: elements.mirrorZ.checked,
   };
 }
 
@@ -164,6 +167,7 @@ function saveSettings() {
     Object.entries(controls).map(([key, control]) => [key, Number(control.input.value)]),
   );
   values.mirrorX = elements.mirrorX.checked;
+  values.mirrorZ = elements.mirrorZ.checked;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(values));
 }
 
@@ -180,6 +184,7 @@ function loadSettings() {
     control.input.value = Number.isFinite(value) ? String(value) : String(control.fallback);
   });
   elements.mirrorX.checked = saved.mirrorX ?? true;
+  elements.mirrorZ.checked = saved.mirrorZ ?? true;
 }
 
 async function startWebcamTracking() {
@@ -282,11 +287,13 @@ function updateTracking(now) {
     if (estimatedPose) {
       // Reverse only the tracked depth response around the default viewing
       // distance. Moving closer now enlarges the scene; moving away shrinks it.
-      estimatedPose.z = THREE.MathUtils.clamp(
-        (DEPTH_INVERSION_REFERENCE_METERS ** 2) / estimatedPose.z,
-        0.25,
-        2.5,
-      );
+      if (calibration.mirrorZ) {
+        estimatedPose.z = THREE.MathUtils.clamp(
+          (DEPTH_INVERSION_REFERENCE_METERS ** 2) / estimatedPose.z,
+          0.25,
+          2.5,
+        );
+      }
       targetPose = estimatedPose;
       trackedFrames += 1;
       setTrackingStatus("Webcam-Tracking");
