@@ -54,3 +54,30 @@ npm run build
 ```
 
 The implementation uses Three.js and MediaPipe Face Landmarker. Webcam-only depth is estimated from apparent eye separation, configured IPD and approximate webcam field of view, so it is less accurate than a dedicated depth/IR tracker.
+
+
+## Flüssige Darstellung
+
+- Unter **Leistung → Grafikqualität** startet die App mit **Flüssig** (Pixelfaktor 1).
+  **Sparsam** (0,75) reduziert die Grafiklast weiter; **Hohe Auflösung** entspricht
+  dem bisherigen Maximum (1,5). Die Auswahl bleibt gespeichert.
+- Gesichtserkennung läuft in einem separaten klassischen Web Worker mit GPU,
+  bei fehlender GPU-Unterstützung mit CPU. Die Anzeige nennt den aktiven Modus.
+  Falls der Worker nicht gestartet werden kann, bleibt ein langsamerer
+  Kompatibilitätsmodus verfügbar.
+- Maximal 30 Tracking-Auswertungen pro Sekunde, maximal ein Bild gleichzeitig.
+  Langsame Auswertungen erzeugen keine Warteschlange. Rendering und
+  Bewegungsglättung laufen unabhängig davon im Animationstakt des Browsers.
+- Mausmodus und ausgeblendete Tabs pausieren neue Tracking-Aufträge.
+- Neue Kalibrierungen starten mit 60 ms Glättung; gespeicherte Werte bleiben
+  erhalten. Bei bisherigen Einstellungen gegebenenfalls unter Tracking auf
+  60 ms stellen. Mehr Glättung beruhigt das Bild, erhöht aber die Verzögerung.
+- Mimik wird nur bei neuen Messwerten zugewiesen; unsichtbare Avatare werden
+  nicht animiert und Diagnosewerte nur fünfmal pro Sekunde aktualisiert.
+
+Nach einem Update den lokalen Server neu starten und den Browser mit Strg+F5
+neu laden. Das MediaPipe-Modell und seine Laufzeit werden weiterhin beim
+Webcam-Start aus dem Internet geladen; Kamerabilder bleiben lokal.
+
+Entwicklertests: `npm test` und `npm run build`. FPS hängen weiterhin von
+Grafikchip, Bildschirmgröße, Kamera, Browser und Energiesparmodus ab.

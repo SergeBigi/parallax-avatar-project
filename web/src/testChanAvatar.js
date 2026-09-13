@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { applyFaceBlendshapes, applyNamedMorphs, indexMorphTargets } from "./faceBlendshapes.js";
 
-const DEFAULT_URL = `${import.meta.env.BASE_URL}models/test-chan/Test-Chan.vrm`;
+const DEFAULT_URL = `${(import.meta.env?.BASE_URL ?? "/")}models/test-chan/Test-Chan.vrm`;
 const RELAXED_ARM_ANGLE = Math.PI / 2;
 const PORTRAIT_SCALE = 2.3;
 const PORTRAIT_OFFSET_Y = -0.96;
@@ -30,7 +30,7 @@ export function createTestChanAvatar({ modelUrl = DEFAULT_URL, onStatus = () => 
   let morphs = new Map();
   let bones = {};
   let bases = new Map();
-  let previousFace = [];
+  let previousFace = null;
   let ready = false;
 
   if (autoload) load();
@@ -66,11 +66,13 @@ export function createTestChanAvatar({ modelUrl = DEFAULT_URL, onStatus = () => 
     for (const [bone, base] of bases) bone.quaternion.copy(base);
     motion.position.y = 0;
     animate(animation, elapsedSeconds, bones, motion, bases);
-    if (previousFace.length) {
-      applyFaceBlendshapes(morphs, previousFace.map((item) => ({ ...item, score: 0 })));
+    if (previousFace !== faceBlendshapes) {
+      if (previousFace?.length) {
+        applyFaceBlendshapes(morphs, previousFace, 0);
+      }
+      applyFaceBlendshapes(morphs, faceBlendshapes);
+      previousFace = faceBlendshapes;
     }
-    applyFaceBlendshapes(morphs, faceBlendshapes);
-    previousFace = faceBlendshapes;
     return true;
   }
 
@@ -148,8 +150,11 @@ function animate(mode, time, bones, motion, bases) {
   motion.position.y = (wave + 1) * 0.002;
 }
 
+const animationEuler = new THREE.Euler();
+const animationDelta = new THREE.Quaternion();
+
 function rotate(bone, bases, x, y, z) {
   if (!bone) return;
-  const delta = new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z, "XYZ"));
-  bone.quaternion.copy(bases.get(bone)).multiply(delta);
+  animationDelta.setFromEuler(animationEuler.set(x, y, z, "XYZ"));
+  bone.quaternion.copy(bases.get(bone)).multiply(animationDelta);
 }

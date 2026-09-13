@@ -115,7 +115,7 @@ export function createRoomScene(
     avatarAnimation = "idle",
     faceBlendshapes = [],
   } = {}) {
-    avatar.update({ elapsedSeconds, animation: avatarAnimation, faceBlendshapes });
+    if (characterVisible && avatarReady) avatar.update({ elapsedSeconds, animation: avatarAnimation, faceBlendshapes });
     const layout = `${screenWidth}/${screenHeight}/${roomDepth}`;
     if (layout === previousLayout) return false;
     previousLayout = layout;

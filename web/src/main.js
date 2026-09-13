@@ -2,6 +2,7 @@ import * as THREE from "three";
 
 import { computeOffAxisFrustum, estimateEyePosition, ExponentialPoseFilter } from "./projectionMath.js";
 import { createParallaxScene } from "./scene.js";
+import { TrackingClient } from "./trackingClient.js";
 import "./style.css";
 
 const MEDIAPIPE_VERSION = "0.10.22-rc.20250304";
@@ -32,6 +33,8 @@ const elements = {
   panelContent: document.querySelector("#panel-content"),
   trackingStatus: document.querySelector("#tracking-status"),
   webcamPreview: document.querySelector("#webcam-preview"),
+  renderQuality: document.querySelector("#render-quality"),
+  trackingBackend: document.querySelector("#tracking-backend"),
   renderFps: document.querySelector("#render-fps"),
   trackingFps: document.querySelector("#tracking-fps"),
   metricX: document.querySelector("#metric-x"),
@@ -45,7 +48,7 @@ const controlDefinitions = {
   cameraY: { input: "camera-y", output: "camera-y-output", suffix: " mm", fallback: 104 },
   ipd: { input: "ipd", output: "ipd-output", suffix: " mm", fallback: 64 },
   fov: { input: "fov", output: "fov-output", suffix: "°", fallback: 60 },
-  smoothing: { input: "smoothing", output: "smoothing-output", suffix: " ms", fallback: 90 },
+  smoothing: { input: "smoothing", output: "smoothing-output", suffix: " ms", fallback: 60 },
   roomDepth: { input: "room-depth", output: "room-depth-output", suffix: " cm", fallback: 45 },
 };
 
@@ -56,7 +59,7 @@ const controls = Object.fromEntries(Object.entries(controlDefinitions).map(([key
 }]));
 
 const renderer = new THREE.WebGLRenderer({ canvas: elements.canvas, antialias: true, powerPreference: "high-performance" });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -70,9 +73,13 @@ const poseFilter = new ExponentialPoseFilter({ x: 0, y: 0.095, z: 0.65 });
 
 let targetPose = { x: 0, y: 0.095, z: 0.65 };
 let faceLandmarker = null;
+let trackingClient = null;
+let trackingTimer = null;
+let trackingGeneration = 0;
+let lastMetricsTimestamp = 0;
+let calibration;
 let cameraStream = null;
 let lastVideoTime = -1;
-let lastTrackingTimestamp = 0;
 let trackedFrames = 0;
 let trackingWindowStarted = performance.now();
 let renderedFrames = 0;
@@ -83,7 +90,7 @@ let latestFaceBlendshapes = [];
 
 loadSettings();
 bindControls();
-resizeRenderer();
+applyRenderQuality();
 updateFullscreenState();
 new ResizeObserver(resizeRenderer).observe(elements.viewport);
 
@@ -126,7 +133,12 @@ function bindControls() {
     control.input.addEventListener("input", () => { renderValue(); saveSettings(); });
     renderValue();
   });
+  calibration = readCalibration();
+  elements.renderQuality.addEventListener("change", () => { applyRenderQuality(); saveSettings(); });
   elements.mouseMode.addEventListener("change", () => {
+    trackingGeneration += 1;
+    trackedFrames = 0;
+    trackingWindowStarted = performance.now();
     if (elements.mouseMode.checked) latestFaceBlendshapes = [];
     setTrackingStatus(elements.mouseMode.checked ? "Mausmodus" : cameraStream ? "Webcam aktiv" : "Webcam aus");
   });
@@ -162,11 +174,14 @@ function readCalibration() {
 }
 
 function saveSettings() {
+  trackingGeneration += 1;
+  calibration = readCalibration();
   const values = Object.fromEntries(Object.entries(controls).map(([key, control]) => [key, Number(control.input.value)]));
   values.mirrorX = elements.mirrorX.checked;
   values.mirrorZ = elements.mirrorZ.checked;
   values.trackedEye = elements.trackedEye.value;
   values.avatarAnimation = elements.avatarAnimation.value;
+  values.renderQuality = elements.renderQuality.value;
   values.scene = elements.sceneSelect.value;
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(values)); } catch { /* storage is optional */ }
 }
@@ -181,6 +196,7 @@ function loadSettings() {
     const value = Number(saved[key]);
     control.input.value = Number.isFinite(value) ? String(value) : String(control.fallback);
   });
+  elements.renderQuality.value = ["0.75", "1", "1.5"].includes(saved.renderQuality) ? saved.renderQuality : "1";
   elements.mirrorX.checked = saved.mirrorX ?? true;
   elements.mirrorZ.checked = saved.mirrorZ ?? true;
   elements.trackedEye.value = ["right", "left"].includes(saved.trackedEye) ? saved.trackedEye : "right";
@@ -195,16 +211,19 @@ async function startWebcamTracking() {
   elements.cameraButton.textContent = "Webcam wird vorbereitet …";
   setTrackingStatus("Modell wird geladen");
   try {
-    const [stream, landmarker] = await Promise.all([openCamera(), createFaceLandmarker()]);
-    cameraStream = stream;
-    faceLandmarker = landmarker;
-    elements.webcamPreview.srcObject = stream;
+    cameraStream = await openCamera();
+    elements.webcamPreview.srcObject = cameraStream;
     await elements.webcamPreview.play();
+    await prepareTracking();
+    lastVideoTime = -1;
+    trackingWindowStarted = performance.now();
+    scheduleTracking();
     elements.mouseMode.checked = false;
     elements.cameraButton.textContent = "Webcam aktiv";
     setTrackingStatus("Gesicht suchen …");
   } catch (error) {
     console.error(error);
+    stopTracking();
     cameraStream?.getTracks().forEach((track) => track.stop());
     cameraStream = null;
     setTrackingStatus(cameraErrorMessage(error), true);
@@ -234,24 +253,57 @@ async function createFaceLandmarker() {
   }
 }
 
-function updateTracking(now) {
+async function prepareTracking() {
+  if (typeof Worker !== "undefined" && typeof createImageBitmap === "function" && typeof OffscreenCanvas !== "undefined") {
+    try {
+      trackingClient = new TrackingClient(new Worker(`${import.meta.env.BASE_URL}tracking-worker.js`));
+      await trackingClient.init(MODEL_PATH);
+      elements.trackingBackend.textContent = `Separat · ${trackingClient.delegate}`;
+      return;
+    } catch (error) {
+      console.warn("Separate tracking unavailable; using compatibility mode.", error);
+      trackingClient?.close();
+      trackingClient = null;
+    }
+  }
+  faceLandmarker = await createFaceLandmarker();
+  elements.trackingBackend.textContent = "Kompatibilitätsmodus";
+}
+
+function scheduleTracking() {
+  clearTimeout(trackingTimer);
+  const tick = async () => {
+    const started = performance.now();
+    await updateTracking(started);
+    // 30 Hz maximum in a worker, 20 Hz in the blocking compatibility fallback.
+    // A slow device processes only the next available frame, never a queue.
+    if (cameraStream) trackingTimer = setTimeout(tick, Math.max(0, (trackingClient ? 1000 / 30 : 50) - (performance.now() - started)));
+  };
+  trackingTimer = setTimeout(tick, 0);
+}
+
+async function updateTracking(now) {
   const video = elements.webcamPreview;
-  if (elements.mouseMode.checked || !faceLandmarker || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.currentTime === lastVideoTime || now - lastTrackingTimestamp < 40 || trackingBusy) return;
+  if (document.hidden || elements.mouseMode.checked || (!trackingClient && !faceLandmarker) || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.currentTime === lastVideoTime || trackingBusy) return;
   trackingBusy = true;
   lastVideoTime = video.currentTime;
-  lastTrackingTimestamp = now;
+  const generation = trackingGeneration;
+  const frameCalibration = calibration;
+  const videoWidth = video.videoWidth;
+  const videoHeight = video.videoHeight;
   try {
-    const result = faceLandmarker.detectForVideo(video, now);
+    const response = trackingClient ? await trackingClient.detect(video, now) : { result: faceLandmarker.detectForVideo(video, now) };
+    if (!response || generation !== trackingGeneration || elements.mouseMode.checked || document.hidden) return;
+    const result = response.result;
     const landmarks = result.faceLandmarks?.[0];
     latestFaceBlendshapes = result.faceBlendshapes?.[0]?.categories ?? [];
-    const calibration = readCalibration();
     const estimatedPose = estimateEyePosition({
-      landmarks, videoWidth: video.videoWidth, videoHeight: video.videoHeight, ipdMeters: calibration.ipdMeters,
-      horizontalFovDegrees: calibration.horizontalFovDegrees, cameraOffsetY: calibration.cameraOffsetY,
-      mirrorX: calibration.mirrorX, trackedEye: calibration.trackedEye,
+      landmarks, videoWidth, videoHeight, ipdMeters: frameCalibration.ipdMeters,
+      horizontalFovDegrees: frameCalibration.horizontalFovDegrees, cameraOffsetY: frameCalibration.cameraOffsetY,
+      mirrorX: frameCalibration.mirrorX, trackedEye: frameCalibration.trackedEye,
     });
     if (estimatedPose) {
-      if (calibration.mirrorZ) estimatedPose.z = THREE.MathUtils.clamp((DEPTH_INVERSION_REFERENCE_METERS ** 2) / estimatedPose.z, 0.25, 2.5);
+      if (frameCalibration.mirrorZ) estimatedPose.z = THREE.MathUtils.clamp((DEPTH_INVERSION_REFERENCE_METERS ** 2) / estimatedPose.z, 0.25, 2.5);
       targetPose = estimatedPose;
       trackedFrames += 1;
       setTrackingStatus("Webcam-Tracking");
@@ -262,15 +314,34 @@ function updateTracking(now) {
   } catch (error) {
     console.error(error);
     latestFaceBlendshapes = [];
-    setTrackingStatus("Trackingfehler", true);
+    stopTracking();
+    cameraStream?.getTracks().forEach((track) => track.stop());
+    cameraStream = null;
+    elements.webcamPreview.srcObject = null;
+    elements.cameraButton.disabled = false;
+    elements.cameraButton.textContent = "Erneut versuchen";
+    setTrackingStatus("Trackingfehler – bitte erneut starten", true);
   } finally { trackingBusy = false; }
+}
+
+function stopTracking() {
+  trackingGeneration += 1;
+  clearTimeout(trackingTimer);
+  trackingClient?.close();
+  trackingClient = null;
+  faceLandmarker?.close();
+  faceLandmarker = null;
+}
+
+function applyRenderQuality() {
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, Number(elements.renderQuality.value)));
+  resizeRenderer();
 }
 
 function renderFrame(now) {
   const deltaSeconds = Math.min((now - lastFrameTimestamp) / 1000, 0.1);
   lastFrameTimestamp = now;
-  updateTracking(now);
-  const calibration = readCalibration();
+
   const eye = poseFilter.update(targetPose, deltaSeconds, calibration.smoothingSeconds);
   const frustum = computeOffAxisFrustum({ eye, screenWidth: calibration.screenWidth, screenHeight: calibration.screenHeight, near: 0.01, far: 10 });
   camera.position.set(eye.x, eye.y, eye.z);
@@ -280,7 +351,10 @@ function renderFrame(now) {
   camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
   if (sceneController.update({ ...calibration, elapsedSeconds: now / 1000, faceBlendshapes: latestFaceBlendshapes })) renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, camera);
-  updateMetrics(eye);
+  if (now - lastMetricsTimestamp >= 200) {
+    updateMetrics(eye);
+    lastMetricsTimestamp = now;
+  }
   updateFps(now);
 }
 
@@ -299,7 +373,7 @@ function updateFps(now) {
     renderedFrames = 0; renderWindowStarted = now;
   }
   if (now - trackingWindowStarted >= 1000) {
-    elements.trackingFps.textContent = faceLandmarker ? `${Math.round((trackedFrames * 1000) / (now - trackingWindowStarted))} fps` : "–";
+    elements.trackingFps.textContent = (faceLandmarker || trackingClient) && !elements.mouseMode.checked ? `${Math.round((trackedFrames * 1000) / (now - trackingWindowStarted))} fps` : "–";
     trackedFrames = 0; trackingWindowStarted = now;
   }
 }
@@ -309,6 +383,8 @@ function updateAvatarStatus(status) {
   elements.avatarStatus.textContent = status.message;
 }
 function setTrackingStatus(message, isError = false) {
+  if (elements.trackingStatus.dataset.message === message && elements.trackingStatus.classList.contains("is-error") === isError) return;
+  elements.trackingStatus.dataset.message = message;
   elements.trackingStatus.classList.toggle("is-error", isError);
   elements.trackingStatus.classList.toggle("is-live", message === "Webcam-Tracking");
   elements.trackingStatus.querySelector("span:last-child").textContent = message;
