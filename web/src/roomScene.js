@@ -121,11 +121,18 @@ export function createRoomScene(
     previousLayout = layout;
 
     room.scale.set(screenWidth, screenHeight, roomDepth);
-    const characterHeight = Math.min(screenHeight * 0.72, screenWidth * 0.6);
-    for (const character of [doll, avatar.object]) {
-      character.scale.setScalar(characterHeight);
-      character.position.set(-screenWidth * 0.035, -screenHeight / 2, -roomDepth * 0.48);
-    }
+
+    // Keep the fallback doll as a full-body depth reference.
+    const dollHeight = Math.min(screenHeight * 0.72, screenWidth * 0.6);
+    doll.scale.setScalar(dollHeight);
+    doll.position.set(-screenWidth * 0.035, -screenHeight / 2, -roomDepth * 0.48);
+
+    // Test-Chan is intentionally framed as a close bust shot and placed just
+    // behind the display plane. The large near/far separation to the back wall
+    // makes head movement produce a much stronger room-depth impression.
+    const avatarHeight = Math.min(screenHeight * 0.9, screenWidth * 0.75);
+    avatar.object.scale.setScalar(avatarHeight);
+    avatar.object.position.set(0, -screenHeight * 0.7, -roomDepth * 0.09);
 
     key.position.set(-screenWidth * 0.7, screenHeight * 1.8, roomDepth * 0.35);
     key.target.position.set(0, -screenHeight * 0.2, -roomDepth * 0.5);
