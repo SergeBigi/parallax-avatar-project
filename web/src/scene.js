@@ -20,9 +20,9 @@ const BOXES = [
   [-0.0581, -0.0111, -0.0359, 0.01, 0.01, 0.05],
 ];
 
-export function createParallaxScene(scene) {
+export function createParallaxScene(scene, { onAvatarStatus = () => {} } = {}) {
   const roomScene = new THREE.Scene();
-  const room = createRoomScene(roomScene);
+  const room = createRoomScene(roomScene, { onAvatarStatus });
   const boxScene = new THREE.Scene();
   boxScene.name = "Original bars scene";
   const box = createBoxScene(boxScene);
@@ -31,7 +31,6 @@ export function createParallaxScene(scene) {
   let shadowsDirty = true;
 
   function setMode(value) {
-    // Migrate the previous prototype avatar selection to the full-body doll.
     if (value === "avatar") value = "room-doll";
     mode = ["room", "room-doll"].includes(value) ? value : "bars";
     boxScene.visible = mode === "bars";
@@ -45,16 +44,15 @@ export function createParallaxScene(scene) {
   setMode(mode);
   return {
     setMode,
-    update(calibration) {
+    update(context) {
       let layoutChanged = false;
-      if (mode === "bars") box.update(calibration);
-      else layoutChanged = room.update(calibration);
-      // All objects and lights are stationary: only refresh shadows on scene
-      // or layout changes, not on every tracked head movement.
+      if (mode === "bars") box.update(context);
+      else layoutChanged = room.update(context);
       const refreshShadows = shadowsDirty || layoutChanged;
       shadowsDirty = false;
       return refreshShadows;
     },
+    applyAvatarMorphs(values) { return room.applyAvatarMorphs(values); },
   };
 }
 
@@ -70,8 +68,6 @@ function createBoxScene(scene) {
     const material = index === 3 ? materials[2] : [4, 5].includes(index) ? materials[1] : materials[0];
     const bar = new THREE.Mesh(geometry, material);
     bar.name = `Original bar ${index + 1}`;
-    // Unity's phone screen extends from x=-0.1347 to x=0.
-    // Centre it on the browser's screen plane.
     bar.position.set(x + 0.06735, y + 0.009, z);
     bar.scale.set(width, height, depth);
     room.add(bar);
@@ -97,7 +93,6 @@ function createBoxScene(scene) {
     mesh.rotation.set(...rotation);
     room.add(mesh);
   }
-  // Five original grid walls, opening at z=0 and back at z=-0.0312.
   wall("Back", 0.1347, 0.062, [0, 0, -0.0312], [0, 0, 0], back);
   wall("Left", 0.0312, 0.062, [-0.06735, 0, -0.0156], [0, Math.PI / 2, 0], side);
   wall("Right", 0.0312, 0.062, [0.06735, 0, -0.0156], [0, -Math.PI / 2, 0], side);
@@ -113,9 +108,6 @@ function createBoxScene(scene) {
   scene.add(fill);
 
   function update({ screenWidth = 0.286, screenHeight = 0.191 } = {}) {
-    // Fit the opening to the calibrated display. Keep depth independent of
-    // display size: the foremost bar ends at 20.25 cm, safely before the
-    // closest tracked eye position (25 cm, near plane 1 cm).
     room.scale.set(screenWidth / 0.1347, screenHeight / 0.062, 1.5);
   }
   update();

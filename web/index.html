@@ -3,168 +3,77 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="Webcam-basierter Proof of Concept für eine brillenlose Parallaxenansicht."
-    />
+    <meta name="description" content="Webcam-basierter Proof of Concept für eine brillenlose Parallaxenansicht." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>ParallaxView PoC</title>
   </head>
   <body>
     <main id="viewport" aria-label="Parallaxenansicht">
       <canvas id="scene-canvas"></canvas>
-
       <header class="topbar">
-        <div class="brand">
-          <span class="brand-mark" aria-hidden="true"></span>
-          <div>
-            <strong>ParallaxView</strong>
-            <span>Web-PoC</span>
-          </div>
-        </div>
-
+        <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div><strong>ParallaxView</strong><span>Web-PoC</span></div></div>
         <label class="scene-picker" for="scene-select">
           <span>Szene</span>
           <select id="scene-select" aria-describedby="scene-description">
             <option value="bars" data-description="Die originalen Balken vor dem Gitterraum.">Balken (Original)</option>
             <option value="room" data-description="Ein offener 3D-Raum. Bodenraster und Wandrahmen machen die Tiefe sichtbar.">3D-Raum</option>
-            <option value="room-doll" data-description="Eine kleine Holzpuppe steht im Raum. Bewege deinen Kopf seitlich und nach oben, um sie aus verschiedenen Blickwinkeln zu sehen.">3D-Raum mit Puppe</option>
+            <option value="room-doll" data-description="Test-Chan steht im Raum. MediaPipe kann ihre ARKit-Gesichtsmorphs ansteuern; Idle, Walk und Jump sind direkt umschaltbar.">3D-Raum mit Test-Chan</option>
           </select>
         </label>
-
         <div class="actions">
-          <div class="status-chip" id="tracking-status" role="status">
-            <span class="status-dot"></span>
-            <span>Mausmodus</span>
-          </div>
-          <button class="button button-primary" id="camera-button" type="button">
-            Webcam starten
-          </button>
-          <button class="button button-secondary" id="fullscreen-button" type="button">
-            Vollbild
-          </button>
+          <div class="status-chip" id="tracking-status" role="status"><span class="status-dot"></span><span>Mausmodus</span></div>
+          <button class="button button-primary" id="camera-button" type="button">Webcam starten</button>
+          <button class="button button-secondary" id="fullscreen-button" type="button">Vollbild</button>
         </div>
       </header>
 
       <aside class="panel" aria-label="Kalibrierung und Diagnose">
         <div class="panel-heading">
-          <div>
-            <span class="eyebrow">Kalibrierung</span>
-            <h1>Virtuelles Fenster</h1>
-          </div>
-          <button
-            class="icon-button"
-            id="panel-toggle"
-            type="button"
-            aria-expanded="true"
-            aria-controls="panel-content"
-            aria-label="Kalibrierung einklappen"
-          >
-            <span aria-hidden="true">−</span>
-          </button>
+          <div><span class="eyebrow">Kalibrierung</span><h1>Virtuelles Fenster</h1></div>
+          <button class="icon-button" id="panel-toggle" type="button" aria-expanded="true" aria-controls="panel-content" aria-label="Kalibrierung einklappen"><span aria-hidden="true">−</span></button>
         </div>
-
         <div id="panel-content">
           <p class="hint" id="scene-description" aria-live="polite"></p>
-          <p class="scene-credit" id="scene-credit">
-            Box Scene © 2018 ALGOMYSTIC AB / Peder Norrby ·
-            <a href="https://github.com/algomystic/TheParallaxView" target="_blank" rel="noopener noreferrer">Original (CC BY-NC)</a>
-          </p>
-          <p class="hint">
-            Bewege im Mausmodus den Zeiger. Starte danach die Webcam und bewege
-            deinen Kopf langsam seitlich. Mit dem Mausrad simulierst du den Abstand.
-          </p>
+          <p class="scene-credit" id="scene-credit">Box Scene © 2018 ALGOMYSTIC AB / Peder Norrby · <a href="https://github.com/algomystic/TheParallaxView" target="_blank" rel="noopener noreferrer">Original (CC BY-NC)</a></p>
+          <p class="hint">Bewege im Mausmodus den Zeiger. Starte danach die Webcam und bewege deinen Kopf langsam seitlich. Mit dem Mausrad simulierst du den Abstand.</p>
 
           <div class="control-list" id="room-controls" hidden>
-            <label for="room-depth">
-              <span>Raumtiefe <output id="room-depth-output">45 cm</output></span>
-              <input id="room-depth" type="range" min="15" max="100" step="5" value="45" />
-            </label>
+            <label for="room-depth"><span>Raumtiefe <output id="room-depth-output">45 cm</output></span><input id="room-depth" type="range" min="15" max="100" step="5" value="45" /></label>
+          </div>
+
+          <div class="control-list avatar-controls" id="avatar-controls" hidden>
+            <p class="avatar-status" id="avatar-status" data-state="loading" role="status">Test-Chan wird geladen …</p>
+            <label for="avatar-animation"><span>Avatar-Animation</span><select id="avatar-animation"><option value="idle">Idle</option><option value="walk">Walk</option><option value="jump">Jump</option></select></label>
+            <small class="avatar-note">Gesichtsmimik wird bei aktiver Webcam aus den MediaPipe-Blendshapes übernommen. Die Morph-Schnittstelle ist zugleich für spätere TTS-Viseme vorbereitet.</small>
           </div>
 
           <div class="metrics" aria-label="Ermittelte Augenposition">
-            <div><span>X</span><strong id="metric-x">0 mm</strong></div>
-            <div><span>Y</span><strong id="metric-y">95 mm</strong></div>
-            <div><span>Abstand</span><strong id="metric-z">650 mm</strong></div>
+            <div><span>X</span><strong id="metric-x">0 mm</strong></div><div><span>Y</span><strong id="metric-y">95 mm</strong></div><div><span>Abstand</span><strong id="metric-z">650 mm</strong></div>
           </div>
+          <div class="mode-row"><label class="switch-row" for="mouse-mode"><span><strong>Maus-Simulation</strong><small>Webcam-Daten vorübergehend übersteuern</small></span><input id="mouse-mode" type="checkbox" checked /></label></div>
 
-          <div class="mode-row">
-            <label class="switch-row" for="mouse-mode">
-              <span>
-                <strong>Maus-Simulation</strong>
-                <small>Webcam-Daten vorübergehend übersteuern</small>
-              </span>
-              <input id="mouse-mode" type="checkbox" checked />
-            </label>
-          </div>
+          <details open><summary>Display und Webcam</summary><div class="control-list">
+            <label><span>Displaybreite <output id="screen-width-output">286 mm</output></span><input id="screen-width" type="range" min="180" max="800" value="286" /></label>
+            <label><span>Displayhöhe <output id="screen-height-output">191 mm</output></span><input id="screen-height" type="range" min="120" max="500" value="191" /></label>
+            <label><span>Webcam über Displaymitte <output id="camera-y-output">104 mm</output></span><input id="camera-y" type="range" min="40" max="300" value="104" /></label>
+          </div></details>
 
-          <details open>
-            <summary>Display und Webcam</summary>
-            <div class="control-list">
-              <label>
-                <span>Displaybreite <output id="screen-width-output">286 mm</output></span>
-                <input id="screen-width" type="range" min="180" max="800" value="286" />
-              </label>
-              <label>
-                <span>Displayhöhe <output id="screen-height-output">191 mm</output></span>
-                <input id="screen-height" type="range" min="120" max="500" value="191" />
-              </label>
-              <label>
-                <span>Webcam über Displaymitte <output id="camera-y-output">104 mm</output></span>
-                <input id="camera-y" type="range" min="40" max="300" value="104" />
-              </label>
-            </div>
-          </details>
+          <details><summary>Tracking</summary><div class="control-list">
+            <label for="tracked-eye"><span>Tracking-Auge</span><select id="tracked-eye"><option value="right">Rechtes Auge</option><option value="left">Linkes Auge</option></select></label>
+            <label><span>Augenabstand <output id="ipd-output">64 mm</output></span><input id="ipd" type="range" min="52" max="76" value="64" /></label>
+            <label><span>Webcam-Sichtfeld <output id="fov-output">60°</output></span><input id="fov" type="range" min="40" max="90" value="60" /></label>
+            <label><span>Glättung <output id="smoothing-output">90 ms</output></span><input id="smoothing" type="range" min="0" max="300" value="90" /></label>
+            <label class="switch-row compact" for="mirror-x"><span><strong>X-Achse spiegeln</strong><small>Für eine zum Betrachter gerichtete Webcam</small></span><input id="mirror-x" type="checkbox" checked /></label>
+            <label class="switch-row compact" for="mirror-z"><span><strong>Z-Achse spiegeln</strong><small>Kehrt die Größenänderung bei Annäherung um</small></span><input id="mirror-z" type="checkbox" checked /></label>
+          </div></details>
 
-          <details>
-            <summary>Tracking</summary>
-            <div class="control-list">
-              <label>
-                <span>Augenabstand <output id="ipd-output">64 mm</output></span>
-                <input id="ipd" type="range" min="52" max="76" value="64" />
-              </label>
-              <label>
-                <span>Webcam-Sichtfeld <output id="fov-output">60°</output></span>
-                <input id="fov" type="range" min="40" max="90" value="60" />
-              </label>
-              <label>
-                <span>Glättung <output id="smoothing-output">90 ms</output></span>
-                <input id="smoothing" type="range" min="0" max="300" value="90" />
-              </label>
-              <label class="switch-row compact" for="mirror-x">
-                <span>
-                  <strong>X-Achse spiegeln</strong>
-                  <small>Für eine zum Betrachter gerichtete Webcam</small>
-                </span>
-                <input id="mirror-x" type="checkbox" checked />
-              </label>
-              <label class="switch-row compact" for="mirror-z">
-                <span>
-                  <strong>Z-Achse spiegeln</strong>
-                  <small>Kehrt die Größenänderung bei Annäherung um</small>
-                </span>
-                <input id="mirror-z" type="checkbox" checked />
-              </label>
-            </div>
-          </details>
-
-          <div class="diagnostics">
-            <span>Rendering <strong id="render-fps">–</strong></span>
-            <span>Tracking <strong id="tracking-fps">–</strong></span>
-          </div>
-
+          <div class="diagnostics"><span>Rendering <strong id="render-fps">–</strong></span><span>Tracking <strong id="tracking-fps">–</strong></span></div>
           <video id="webcam-preview" autoplay muted playsinline aria-label="Webcam-Vorschau"></video>
-          <p class="privacy-note">
-            Die Webcam-Auswertung läuft lokal im Browser. Es wird kein Video hochgeladen.
-          </p>
+          <p class="privacy-note">Die Webcam-Auswertung läuft lokal im Browser. Es wird kein Video hochgeladen.</p>
         </div>
       </aside>
-
-      <div class="fullscreen-note" id="fullscreen-note">
-        Für korrekte Geometrie Vollbild verwenden und die sichtbare Displayfläche eintragen.
-      </div>
+      <div class="fullscreen-note" id="fullscreen-note">Für korrekte Geometrie Vollbild verwenden und die sichtbare Displayfläche eintragen.</div>
     </main>
-
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

@@ -37,8 +37,9 @@ export function computeOffAxisFrustum({
 }
 
 /**
- * Estimate a metric viewer position from MediaPipe face landmarks. The depth
- * estimate uses apparent eye separation and an assumed physical IPD.
+ * Estimate a metric viewer position from MediaPipe face landmarks. Depth is
+ * still derived from the apparent separation of both eyes, while x/y can use
+ * either physical eye as the monoscopic off-axis viewpoint.
  */
 export function estimateEyePosition({
   landmarks,
@@ -48,6 +49,7 @@ export function estimateEyePosition({
   horizontalFovDegrees,
   cameraOffsetY,
   mirrorX = true,
+  trackedEye = "right",
 }) {
   if (!landmarks || landmarks.length < 363 || videoWidth <= 0 || videoHeight <= 0) {
     return null;
@@ -58,11 +60,11 @@ export function estimateEyePosition({
     y: (landmarks[a].y + landmarks[b].y) / 2,
   });
 
-  // Eye centres approximated from the inner and outer eye corners.
-  const eyeA = average(33, 133);
-  const eyeB = average(362, 263);
-  const dxPixels = (eyeA.x - eyeB.x) * videoWidth;
-  const dyPixels = (eyeA.y - eyeB.y) * videoHeight;
+  // MediaPipe landmark indices refer to the subject's physical eyes.
+  const rightEye = average(33, 133);
+  const leftEye = average(362, 263);
+  const dxPixels = (rightEye.x - leftEye.x) * videoWidth;
+  const dyPixels = (rightEye.y - leftEye.y) * videoHeight;
   const eyeDistancePixels = Math.hypot(dxPixels, dyPixels);
 
   if (!Number.isFinite(eyeDistancePixels) || eyeDistancePixels < 4) {
@@ -72,8 +74,14 @@ export function estimateEyePosition({
   const horizontalFovRadians = (horizontalFovDegrees * Math.PI) / 180;
   const focalPixels = videoWidth / (2 * Math.tan(horizontalFovRadians / 2));
   const z = clamp((focalPixels * ipdMeters) / eyeDistancePixels, 0.25, 2.5);
-  const centreX = ((eyeA.x + eyeB.x) / 2) * videoWidth;
-  const centreY = ((eyeA.y + eyeB.y) / 2) * videoHeight;
+
+  const selectedEye = trackedEye === "left"
+    ? leftEye
+    : trackedEye === "midpoint"
+      ? { x: (rightEye.x + leftEye.x) / 2, y: (rightEye.y + leftEye.y) / 2 }
+      : rightEye;
+  const centreX = selectedEye.x * videoWidth;
+  const centreY = selectedEye.y * videoHeight;
   const xFromCamera = ((centreX - videoWidth / 2) * z) / focalPixels;
   const yFromCamera = (-(centreY - videoHeight / 2) * z) / focalPixels;
 

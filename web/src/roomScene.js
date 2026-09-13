@@ -1,12 +1,14 @@
 import * as THREE from "three";
 
+import { createTestChanAvatar } from "./testChanAvatar.js";
+
 /** A stationary miniature room, with its open front on the display at z = 0. */
-export function createRoomScene(scene) {
+export function createRoomScene(
+  scene,
+  { onAvatarStatus = () => {}, loadAvatar = typeof window !== "undefined" } = {},
+) {
   scene.name = "Miniature room scene";
   scene.background = new THREE.Color(0x182a35);
-
-  // Only the architecture is scaled non-uniformly to fit the calibrated screen.
-  // The doll is a separate, uniformly scaled object so its proportions stay intact.
   const room = new THREE.Group();
   room.name = "Room architecture";
   scene.add(room);
@@ -44,11 +46,8 @@ export function createRoomScene(scene) {
   wall("Room floor", 1, 1, [0, -0.5, -0.5], [-Math.PI / 2, 0, 0], floorMaterial);
   wall("Room ceiling", 1, 1, [0, 0.5, -0.5], [Math.PI / 2, 0, 0], ceilingMaterial);
 
-  // Repeated wall ribs and floor joints make changes in perspective easy to see.
   for (const z of [0, -0.25, -0.5, -0.75, -0.995]) {
-    for (const x of [-0.495, 0.495]) {
-      trim("Wall rib", [0.012, 1, 0.004], [x, 0, z]);
-    }
+    for (const x of [-0.495, 0.495]) trim("Wall rib", [0.012, 1, 0.004], [x, 0, z]);
     trim("Ceiling rib", [1, 0.012, 0.004], [0, 0.495, z]);
   }
   for (const x of [-0.492, 0.492]) {
@@ -76,17 +75,24 @@ export function createRoomScene(scene) {
   floorJoints.name = "Floor depth grid";
   room.add(floorJoints);
 
-  // A recessed wall panel is an additional depth reference behind the doll.
   trim("Back panel", [0.42, 0.43, 0.009], [0, 0.08, -0.991], material(0x365962));
-  for (const x of [-0.217, 0.217]) {
-    trim("Back panel frame", [0.014, 0.458, 0.014], [x, 0.08, -0.982], accentMaterial);
-  }
-  for (const y of [-0.142, 0.302]) {
-    trim("Back panel frame", [0.448, 0.014, 0.014], [0, y, -0.982], accentMaterial);
-  }
+  for (const x of [-0.217, 0.217]) trim("Back panel frame", [0.014, 0.458, 0.014], [x, 0.08, -0.982], accentMaterial);
+  for (const y of [-0.142, 0.302]) trim("Back panel frame", [0.448, 0.014, 0.014], [0, y, -0.982], accentMaterial);
 
   const doll = createDoll();
   scene.add(doll);
+  let characterVisible = true;
+  let avatarReady = false;
+  const avatar = createTestChanAvatar({
+    autoload: loadAvatar,
+    onStatus(status) {
+      avatarReady = status.state === "ready";
+      if (status.state !== "loading") syncCharacterVisibility();
+      onAvatarStatus(status);
+    },
+  });
+  avatar.object.visible = false;
+  scene.add(avatar.object);
 
   scene.add(new THREE.HemisphereLight(0xe4f3ff, 0x776046, 1.5));
   const key = new THREE.DirectionalLight(0xffefd8, 2.4);
@@ -101,35 +107,47 @@ export function createRoomScene(scene) {
   scene.add(fill);
 
   let previousLayout = "";
-  function update({ screenWidth = 0.286, screenHeight = 0.191, roomDepth = 0.45 } = {}) {
+  function update({
+    screenWidth = 0.286,
+    screenHeight = 0.191,
+    roomDepth = 0.45,
+    elapsedSeconds = 0,
+    avatarAnimation = "idle",
+    faceBlendshapes = [],
+  } = {}) {
+    avatar.update({ elapsedSeconds, animation: avatarAnimation, faceBlendshapes });
     const layout = `${screenWidth}/${screenHeight}/${roomDepth}`;
     if (layout === previousLayout) return false;
     previousLayout = layout;
 
     room.scale.set(screenWidth, screenHeight, roomDepth);
-    const dollHeight = Math.min(screenHeight * 0.72, screenWidth * 0.6);
-    doll.scale.setScalar(dollHeight);
-    // The feet rest on the floor. This transform never follows or faces the eye.
-    doll.position.set(-screenWidth * 0.035, -screenHeight / 2, -roomDepth * 0.48);
+    const characterHeight = Math.min(screenHeight * 0.72, screenWidth * 0.6);
+    for (const character of [doll, avatar.object]) {
+      character.scale.setScalar(characterHeight);
+      character.position.set(-screenWidth * 0.035, -screenHeight / 2, -roomDepth * 0.48);
+    }
 
     key.position.set(-screenWidth * 0.7, screenHeight * 1.8, roomDepth * 0.35);
     key.target.position.set(0, -screenHeight * 0.2, -roomDepth * 0.5);
     const span = Math.max(screenWidth, screenHeight, roomDepth) * 0.9;
-    Object.assign(key.shadow.camera, {
-      left: -span, right: span, top: span, bottom: -span, near: 0.01, far: span * 6,
-    });
+    Object.assign(key.shadow.camera, { left: -span, right: span, top: span, bottom: -span, near: 0.01, far: span * 6 });
     key.shadow.camera.updateProjectionMatrix();
     return true;
   }
   update();
 
+  function syncCharacterVisibility() {
+    doll.visible = characterVisible && !avatarReady;
+    avatar.object.visible = characterVisible && avatarReady;
+  }
+
   return {
     update,
-    setDollVisible(visible) { doll.visible = visible; },
+    setDollVisible(visible) { characterVisible = visible; syncCharacterVisibility(); },
+    applyAvatarMorphs(values) { return avatar.applyNamedMorphs(values); },
   };
 }
 
-/** A small, fully volumetric wooden doll with jointed limbs and a blue outfit. */
 function createDoll() {
   const doll = new THREE.Group();
   doll.name = "Wooden doll";
@@ -140,8 +158,8 @@ function createDoll() {
   const cream = new THREE.MeshStandardMaterial({ color: 0xffe6b7, roughness: 0.6 });
   const sphere = new THREE.SphereGeometry(1, 20, 14);
 
-  function ellipsoid(name, position, scale, material) {
-    const mesh = new THREE.Mesh(sphere, material);
+  function ellipsoid(name, position, scale, surface) {
+    const mesh = new THREE.Mesh(sphere, surface);
     mesh.name = name;
     mesh.position.set(...position);
     mesh.scale.set(...scale);
@@ -150,14 +168,11 @@ function createDoll() {
     doll.add(mesh);
     return mesh;
   }
-
-  function limb(name, from, to, radius, material) {
+  function limb(name, from, to, radius, surface) {
     const start = new THREE.Vector3(...from);
     const end = new THREE.Vector3(...to);
     const direction = end.clone().sub(start);
-    const mesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(radius * 0.88, radius, direction.length(), 12), material,
-    );
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.88, radius, direction.length(), 12), surface);
     mesh.name = name;
     mesh.position.copy(start).add(end).multiplyScalar(0.5);
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
@@ -180,7 +195,6 @@ function createDoll() {
     ellipsoid("Doll elbow joint", elbow, [0.034, 0.034, 0.034], joints);
     limb("Doll forearm", elbow, wrist, 0.028, wood);
     ellipsoid("Doll hand", [side * 0.18, 0.361, 0.039], [0.033, 0.044, 0.028], wood);
-
     const hip = [side * 0.07, 0.369, 0];
     const knee = [side * 0.085, 0.213, 0.014];
     const ankle = [side * 0.091, 0.065, 0.017];
@@ -188,7 +202,6 @@ function createDoll() {
     ellipsoid("Doll knee joint", knee, [0.038, 0.038, 0.038], joints);
     limb("Doll shin", knee, ankle, 0.032, wood);
     ellipsoid("Doll shoe", [side * 0.091, 0.034, 0.046], [0.054, 0.034, 0.088], dark);
-
     ellipsoid("Doll ear", [side * 0.145, 0.816, 0.005], [0.022, 0.035, 0.022], joints);
     ellipsoid("Doll eye", [side * 0.049, 0.85, 0.133], [0.016, 0.022, 0.009], dark);
     ellipsoid("Doll eye highlight", [side * 0.049 - 0.004, 0.857, 0.141], [0.004, 0.005, 0.003], cream);
@@ -199,8 +212,6 @@ function createDoll() {
   smile.rotation.z = Math.PI;
   smile.position.set(0, 0.795, 0.14);
   doll.add(smile);
-  for (const y of [0.555, 0.485]) {
-    ellipsoid("Outfit button", [0, y, 0.078], [0.01, 0.01, 0.006], cream);
-  }
+  for (const y of [0.555, 0.485]) ellipsoid("Outfit button", [0, y, 0.078], [0.01, 0.01, 0.006], cream);
   return doll;
 }

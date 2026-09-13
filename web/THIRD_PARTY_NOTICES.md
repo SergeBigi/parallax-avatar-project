@@ -1,3 +1,12 @@
+# Test-Chan
+
+Intended avatar asset: Test-Chan v1.3 by Kana Fuyuko.
+Source: https://booth.pm/en/items/5419110
+
+The creator's listing describes Test-Chan as Public Domain and permits editing and reuse without an attribution requirement. The project records the source here for traceability. The advanced v1.3 package contains ARKit, Vive Lip Tracker, OVRLipSync and CamMatic facial blendshapes.
+
+The binary VRM is not included by this change because BOOTH requires an authenticated free download. See `public/models/test-chan/README.md`.
+
 # TheParallaxView Box Scene
 
 The bar layout is adapted from `Assets/HeadTrackScene.unity` (BoxScene / GridBox / Boxes) in https://github.com/algomystic/TheParallaxView at commit 1af9570fc3ae0f0776a783e37cc7ee6a1681145e.
@@ -41,7 +50,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-
-
-

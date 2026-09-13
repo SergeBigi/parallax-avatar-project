@@ -36,11 +36,34 @@ test("eye separation yields a finite metric pose", () => {
     ipdMeters: 0.064,
     horizontalFovDegrees: 60,
     cameraOffsetY: 0.1,
+    trackedEye: "midpoint",
   });
 
   assert.ok(pose.z > 0.5 && pose.z < 0.6);
   assert.ok(Math.abs(pose.x) < Number.EPSILON);
   assert.equal(pose.y, 0.1);
+});
+
+test("right and left eye selections produce opposite monoscopic x offsets", () => {
+  const landmarks = Array.from({ length: 478 }, () => ({ x: 0.5, y: 0.5 }));
+  landmarks[33] = landmarks[133] = { x: 0.45, y: 0.5 };
+  landmarks[362] = landmarks[263] = { x: 0.55, y: 0.5 };
+  const base = {
+    landmarks,
+    videoWidth: 640,
+    videoHeight: 480,
+    ipdMeters: 0.064,
+    horizontalFovDegrees: 60,
+    cameraOffsetY: 0.1,
+    mirrorX: false,
+  };
+
+  const right = estimateEyePosition({ ...base, trackedEye: "right" });
+  const left = estimateEyePosition({ ...base, trackedEye: "left" });
+  assert.ok(right.x < 0);
+  assert.ok(left.x > 0);
+  assert.ok(Math.abs(right.x + left.x) < 1e-12);
+  assert.equal(right.z, left.z);
 });
 
 test("pose filter converges without overshooting", () => {

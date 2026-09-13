@@ -1,85 +1,50 @@
 # ParallaxView Web PoC
 
-This browser prototype ports the central idea of TheParallaxView to a fixed
-Windows display with an ordinary webcam:
+Browser prototype of the TheParallaxView idea for a fixed Windows display and a normal webcam:
 
-`face landmarks -> metric eye estimate -> display calibration -> off-axis projection`
+`face landmarks -> selected eye -> display calibration -> off-axis projection`
 
-It is intentionally a geometry and tracking prototype. The scenes use lightweight
-3D geometry so that an older Surface can validate the depth illusion.
+## Scenes
 
-## Select a scene
+- **Balken (Original)** – port of the original bar/grid scene.
+- **3D-Raum** – open depth-reference room.
+- **3D-Raum mit Test-Chan** – humanoid VRM avatar with selectable Idle, Walk and Jump motion plus webcam-driven facial blendshapes.
 
-The **Szene** menu at the top remains available when calibration is collapsed:
+The room depth, selected tracking eye and calibration values are stored locally in the browser.
 
-- **Balken (Original)**: the existing port of the original bars and grid box.
-- **3D-Raum**: an open room with five walls, floor joints, repeated wall ribs and
-  a back panel as depth references.
-- **3D-Raum mit Puppe**: the same room with a small, full-body wooden doll,
-  volumetric limbs, a face and a floor shadow. The doll stays on the floor;
-  moving your head changes the viewing position and asymmetric projection.
+## Test-Chan asset
 
-Both room scenes share a **Raumtiefe** slider (15–100 cm, initially 45 cm).
-The scene, room depth and calibration settings are remembered in this browser
-when local storage is available. An earlier saved **Avatar** selection opens
-the new room with doll. Scene switching does not restart webcam tracking.
+The app expects the advanced Test-Chan v1.3 VRM here:
 
-For a clear view, collapse calibration with **−** and use **Vollbild**. Start with
-slow sideways and up/down head movements; increase room depth to compare the
-relative movement of the doll and the back wall. In mouse mode, move over the
-scene and use the wheel for viewing distance; interacting with menus and sliders
-does not move the simulated viewpoint.
+`public/models/test-chan/Test-Chan.vrm`
 
-## Requirements
+Source: https://booth.pm/en/items/5419110
 
-- Windows 11;
-- current Microsoft Edge or Google Chrome;
-- integrated or USB webcam;
-- Node.js 20.19 or newer;
-- internet access during the first start to download the MediaPipe WASM and
-  face-landmark model.
+BOOTH requires a free pixiv/BOOTH sign-in for the download. Download the v1.3 package with ARKit / Vive Lip Tracker / OVRLipSync blendshapes, extract the `.vrm`, rename it to `Test-Chan.vrm` if necessary and put it at the path above. Until the file is present, the old wooden doll remains visible as a fallback and the UI reports that the VRM is missing.
+
+## Avatar pipeline
+
+- Three.js `GLTFLoader` loads the VRM directly, so no additional npm dependency is needed.
+- MediaPipe Face Landmarker runs with `outputFaceBlendshapes: true`.
+- ARKit-style categories such as `jawOpen`, `mouthSmileLeft` and `eyeBlinkRight` are matched against the VRM's morph targets.
+- A named-morph API is already available for the later TTS/viseme pipeline.
+- Idle, Walk and Jump use lightweight procedural humanoid bone animation for this PoC.
+- **Tracking-Auge** switches the monoscopic off-axis viewpoint between the physical right and left eye. Depth estimation still uses the separation of both eyes.
 
 ## Start on Windows
 
-1. Clone the repository with its reference submodule:
+Requirements: Windows 11, current Edge/Chrome, webcam, Node.js 20.19+.
 
-   ```powershell
-   git clone --recurse-submodules https://github.com/SergeBigi/parallax-avatar-project.git
-   cd parallax-avatar-project\web
-   ```
+```powershell
+git clone --recurse-submodules https://github.com/SergeBigi/parallax-avatar-project.git
+cd parallax-avatar-project\web
+npm install
+npm run dev
+```
 
-2. Double-click `start-webview.cmd`, or run:
+Or double-click `start-webview.cmd` after dependencies are installed. The browser opens `http://127.0.0.1:5173`.
 
-   ```powershell
-   npm install
-   npm run dev
-   ```
-
-3. The browser opens `http://127.0.0.1:5173` automatically. Keep the command
-   window open while using the prototype.
-4. Test the projection with the mouse first. The mouse wheel changes the
-   simulated viewing distance.
-5. Select **Webcam starten**, grant camera access, then disable mouse
-   simulation if it is still enabled.
-6. Use full-screen mode and enter the measured width and height of the visible
-   display area. Enter the distance from the display centre to the webcam.
-
-The browser must run on `localhost` or HTTPS for camera access. The face model
-runs in the browser; webcam frames are not uploaded by this application.
-
-## Calibration notes
-
-- Measure only the visible display surface, excluding the bezel.
-- The webcam offset is positive when the camera is above the display centre.
-- Start with an assumed IPD of 64 mm if the actual value is unknown.
-- Adjust webcam horizontal field of view until the displayed distance roughly
-  matches the real eye-to-screen distance.
-- If the virtual scene moves in the wrong horizontal direction, change
-  **X-Achse spiegeln**.
-- **Z-Achse spiegeln** preserves the previous optional inversion of webcam
-  depth around 65 cm. It changes the near/far response; mouse-wheel simulation
-  continues to control the virtual eye distance directly.
-- The illusion is geometrically correct for one viewer only.
+Use mouse mode first, then start the webcam. For the strongest geometry effect use fullscreen and enter the visible display width/height and webcam offset accurately. Webcam frames stay local in the browser.
 
 ## Development checks
 
@@ -88,14 +53,4 @@ npm test
 npm run build
 ```
 
-The implementation uses Three.js for WebGL rendering and MediaPipe Face
-Landmarker for single-camera facial landmarks. Depth is estimated from the
-apparent eye separation, the configured IPD and the approximate webcam field
-of view; therefore it is less accurate than a depth or infrared tracker.
-
-All scenes share the same calibrated screen plane at z = 0 and off-axis camera.
-The new room is behind that plane. Its architecture fits the entered display
-dimensions; the doll scales uniformly to preserve its proportions. Shadow maps
-are refreshed only when the selected scene or room dimensions change, since
-neither the doll nor the lighting is animated. No extra model downloads or npm
-dependencies are required for the two room scenes.
+The implementation uses Three.js and MediaPipe Face Landmarker. Webcam-only depth is estimated from apparent eye separation, configured IPD and approximate webcam field of view, so it is less accurate than a dedicated depth/IR tracker.
