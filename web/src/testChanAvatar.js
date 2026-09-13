@@ -3,6 +3,9 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { applyFaceBlendshapes, applyNamedMorphs, indexMorphTargets } from "./faceBlendshapes.js";
 
 const DEFAULT_URL = `${import.meta.env.BASE_URL}models/test-chan/Test-Chan.vrm`;
+const RELAXED_ARM_ANGLE = Math.PI / 2;
+const PORTRAIT_SCALE = 2.3;
+const PORTRAIT_OFFSET_Y = -0.96;
 const BONE_NAMES = {
   chest: ["J_Bip_C_Chest", "Chest", "UpperChest"],
   head: ["J_Bip_C_Head", "Head"],
@@ -15,8 +18,14 @@ const BONE_NAMES = {
 export function createTestChanAvatar({ modelUrl = DEFAULT_URL, onStatus = () => {}, autoload = true } = {}) {
   const root = new THREE.Group();
   root.name = "Test-Chan avatar";
+  const framing = new THREE.Group();
+  framing.name = "Test-Chan portrait framing";
+  framing.scale.setScalar(PORTRAIT_SCALE);
+  framing.position.y = PORTRAIT_OFFSET_Y;
+  root.add(framing);
+
   const motion = new THREE.Group();
-  root.add(motion);
+  framing.add(motion);
 
   let morphs = new Map();
   let bones = {};
@@ -41,7 +50,8 @@ export function createTestChanAvatar({ modelUrl = DEFAULT_URL, onStatus = () => 
       motion.add(model);
       morphs = indexMorphTargets(model);
       bones = findBones(model);
-      bases = new Map(Object.values(bones).filter(Boolean).map((bone) => [bone, bone.quaternion.clone()]));
+      bases = createRelaxedBases(bones);
+      for (const [bone, base] of bases) bone.quaternion.copy(base);
       ready = true;
       const count = new Set([...morphs.values()].flat().map((entry) => entry.name)).size;
       onStatus({ state: "ready", message: `Test-Chan bereit · ${count} Morph Targets erkannt`, morphTargetCount: count });
@@ -95,6 +105,19 @@ function findBones(model) {
   ]));
 }
 
+function createRelaxedBases(bones) {
+  const result = new Map(Object.values(bones).filter(Boolean).map((bone) => [bone, bone.quaternion.clone()]));
+  offsetBase(bones.leftArm, result, 0, 0, RELAXED_ARM_ANGLE);
+  offsetBase(bones.rightArm, result, 0, 0, -RELAXED_ARM_ANGLE);
+  return result;
+}
+
+function offsetBase(bone, bases, x, y, z) {
+  if (!bone || !bases.has(bone)) return;
+  const delta = new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z, "XYZ"));
+  bases.get(bone).multiply(delta);
+}
+
 function clean(name) {
   return String(name ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -102,8 +125,11 @@ function clean(name) {
 function animate(mode, time, bones, motion, bases) {
   const wave = Math.sin(time * (mode === "walk" ? 6.2 : 1.7));
   if (mode === "walk") {
-    rotate(bones.leftArm, bases, -wave * 0.45, 0, 0);
-    rotate(bones.rightArm, bases, wave * 0.45, 0, 0);
+    // Both arms start in the relaxed down pose. The same local Y rotation makes
+    // them swing in opposite front/back directions because the bones point in
+    // opposite X directions in Test-Chan's humanoid skeleton.
+    rotate(bones.leftArm, bases, 0, wave * 0.34, 0);
+    rotate(bones.rightArm, bases, 0, wave * 0.34, 0);
     rotate(bones.leftLeg, bases, wave * 0.42, 0, 0);
     rotate(bones.rightLeg, bases, -wave * 0.42, 0, 0);
     motion.position.y = Math.abs(wave) * 0.012;
@@ -112,9 +138,9 @@ function animate(mode, time, bones, motion, bases) {
   if (mode === "jump") {
     const phase = (time % 2.2) / 2.2;
     motion.position.y = phase > 0.18 && phase < 0.72 ? Math.sin(((phase - 0.18) / 0.54) * Math.PI) * 0.13 : 0;
-    const arms = motion.position.y > 0 ? -1.35 : -0.15;
-    rotate(bones.leftArm, bases, arms, 0, -0.15);
-    rotate(bones.rightArm, bases, arms, 0, 0.15);
+    const lift = motion.position.y > 0 ? 2.15 : 0;
+    rotate(bones.leftArm, bases, 0, 0, -lift);
+    rotate(bones.rightArm, bases, 0, 0, lift);
     return;
   }
   rotate(bones.chest, bases, wave * 0.018, 0, wave * 0.01);
