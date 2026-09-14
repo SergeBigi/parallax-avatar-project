@@ -3,6 +3,8 @@ import * as THREE from "three";
 import { createRoomStyles } from "./roomStyles.js";
 import { createTestChanAvatar } from "./testChanAvatar.js";
 
+const DYNAMIC_SHADOW_INTERVAL_SECONDS = 1 / 15;
+
 /** A stationary miniature room, with its open front on the display at z = 0. */
 export function createRoomScene(
   scene,
@@ -37,7 +39,6 @@ export function createRoomScene(
   wall("Room floor", 1, 1, [0, -0.5, -0.5], [-Math.PI / 2, 0, 0], floorMaterial);
   wall("Room ceiling", 1, 1, [0, 0.5, -0.5], [Math.PI / 2, 0, 0], ceilingMaterial);
 
-  // Subtle floor joints stay in every design and make the z-axis easy to read.
   const joints = [];
   for (let i = 1; i < 9; i += 1) {
     const z = -i / 9;
@@ -55,7 +56,6 @@ export function createRoomScene(
   floorJoints.name = "Floor depth grid";
   room.add(floorJoints);
 
-  // Three selectable environments share the same calibrated room shell.
   const roomStyles = createRoomStyles(room);
 
   const doll = createDoll();
@@ -73,19 +73,30 @@ export function createRoomScene(
   avatar.object.visible = false;
   scene.add(avatar.object);
 
-  scene.add(new THREE.HemisphereLight(0xbdd9e5, 0x101217, 1.15));
-  const key = new THREE.DirectionalLight(0xd9f2ff, 1.9);
+  scene.add(new THREE.HemisphereLight(0xc9e1eb, 0x101217, 1.18));
+  const key = new THREE.DirectionalLight(0xe7f5ff, 2.15);
   key.name = "Room key light";
   key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
-  key.shadow.bias = -0.0002;
-  key.shadow.normalBias = 0.0003;
+  key.shadow.mapSize.set(512, 512);
+  key.shadow.bias = -0.00035;
+  key.shadow.normalBias = 0.0012;
+  key.shadow.radius = 2;
   scene.add(key, key.target);
-  const fill = new THREE.DirectionalLight(0x6fded5, 0.48);
+
+  const fill = new THREE.DirectionalLight(0x7ce6de, 0.44);
+  fill.name = "Room fill light";
   fill.position.set(0.45, 0.12, 0.15);
   scene.add(fill);
 
+  const rim = new THREE.DirectionalLight(0x8aa7ff, 0.34);
+  rim.name = "Avatar rim light";
+  rim.position.set(0.28, 0.32, -0.28);
+  rim.target.position.set(0, 0.02, -0.05);
+  scene.add(rim, rim.target);
+
   let previousLayout = "";
+  let previousStyle = roomStyles.getStyle();
+  let lastDynamicShadowRefresh = -Infinity;
   function update({
     screenWidth = 0.286,
     screenHeight = 0.191,
@@ -94,32 +105,56 @@ export function createRoomScene(
     avatarAnimation = "idle",
     faceBlendshapes = [],
   } = {}) {
-    if (characterVisible && avatarReady) avatar.update({ elapsedSeconds, animation: avatarAnimation, faceBlendshapes });
+    const avatarAnimated = characterVisible && avatarReady;
+    if (avatarAnimated) avatar.update({ elapsedSeconds, animation: avatarAnimation, faceBlendshapes });
+
+    let shadowsDirty = false;
+    const currentStyle = roomStyles.getStyle();
+    if (currentStyle !== previousStyle) {
+      previousStyle = currentStyle;
+      shadowsDirty = true;
+    }
+
     const layout = `${screenWidth}/${screenHeight}/${roomDepth}`;
-    if (layout === previousLayout) return false;
-    previousLayout = layout;
+    if (layout !== previousLayout) {
+      previousLayout = layout;
+      shadowsDirty = true;
+      room.scale.set(screenWidth, screenHeight, roomDepth);
 
-    room.scale.set(screenWidth, screenHeight, roomDepth);
+      const dollHeight = Math.min(screenHeight * 0.72, screenWidth * 0.6);
+      doll.scale.setScalar(dollHeight);
+      doll.position.set(-screenWidth * 0.035, -screenHeight / 2, -roomDepth * 0.48);
 
-    // Keep the fallback doll as a full-body depth reference while Test-Chan loads.
-    const dollHeight = Math.min(screenHeight * 0.72, screenWidth * 0.6);
-    doll.scale.setScalar(dollHeight);
-    doll.position.set(-screenWidth * 0.035, -screenHeight / 2, -roomDepth * 0.48);
+      const avatarHeight = Math.min(screenHeight * 0.9, screenWidth * 0.75);
+      avatar.object.scale.setScalar(avatarHeight);
+      avatar.object.position.set(0, -screenHeight * 0.7, -roomDepth * 0.09);
 
-    // Test-Chan stays immediately behind the display plane. The room designs
-    // deliberately place strong geometry much farther back for maximum parallax.
-    const avatarHeight = Math.min(screenHeight * 0.9, screenWidth * 0.75);
-    avatar.object.scale.setScalar(avatarHeight);
-    avatar.object.position.set(0, -screenHeight * 0.7, -roomDepth * 0.09);
+      key.position.set(-screenWidth * 0.68, screenHeight * 1.62, roomDepth * 0.28);
+      key.target.position.set(0, -screenHeight * 0.1, -roomDepth * 0.16);
+      fill.position.set(screenWidth * 0.62, screenHeight * 0.42, roomDepth * 0.12);
+      rim.position.set(screenWidth * 0.46, screenHeight * 0.78, -roomDepth * 0.34);
+      rim.target.position.set(0, screenHeight * 0.06, -roomDepth * 0.08);
 
-    key.position.set(-screenWidth * 0.65, screenHeight * 1.55, roomDepth * 0.22);
-    key.target.position.set(0, -screenHeight * 0.12, -roomDepth * 0.12);
-    const span = Math.max(screenWidth, screenHeight, roomDepth) * 0.9;
-    Object.assign(key.shadow.camera, { left: -span, right: span, top: span, bottom: -span, near: 0.01, far: span * 6 });
-    key.shadow.camera.updateProjectionMatrix();
-    return true;
+      const span = Math.max(screenWidth, screenHeight, roomDepth) * 0.95;
+      Object.assign(key.shadow.camera, {
+        left: -span,
+        right: span,
+        top: span,
+        bottom: -span,
+        near: 0.01,
+        far: span * 6,
+      });
+      key.shadow.camera.updateProjectionMatrix();
+    }
+
+    if (avatarAnimated && elapsedSeconds - lastDynamicShadowRefresh >= DYNAMIC_SHADOW_INTERVAL_SECONDS) {
+      lastDynamicShadowRefresh = elapsedSeconds;
+      shadowsDirty = true;
+    }
+    return shadowsDirty;
   }
   update();
+  previousLayout = "";
 
   function syncCharacterVisibility() {
     doll.visible = characterVisible && !avatarReady;
