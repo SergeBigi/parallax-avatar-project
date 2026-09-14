@@ -17,7 +17,7 @@
           <select id="scene-select" aria-describedby="scene-description">
             <option value="bars" data-description="Die originalen Balken vor dem Gitterraum.">Balken (Original)</option>
             <option value="room" data-description="Ein offener 3D-Raum. Bodenraster und Wandrahmen machen die Tiefe sichtbar.">3D-Raum</option>
-            <option value="room-doll" selected data-description="Test-Chan steht im Raum. MediaPipe kann ihre ARKit-Gesichtsmorphs ansteuern; Idle, Walk und Jump sind direkt umschaltbar.">3D-Raum mit Test-Chan</option>
+            <option value="room-doll" selected data-description="Test-Chan steht direkt vorne. Wähle darunter eines von drei Raumdesigns und vergleiche deren Tiefenwirkung.">3D-Raum mit Test-Chan</option>
           </select>
         </label>
         <div class="actions">
@@ -43,6 +43,8 @@
 
           <div class="control-list avatar-controls" id="avatar-controls" hidden>
             <p class="avatar-status" id="avatar-status" data-state="loading" role="status">Test-Chan wird geladen …</p>
+            <label for="room-style"><span>Raumdesign</span><select id="room-style"><option value="studio" selected>1 · Futuristisches Avatar-Studio</option><option value="stream">2 · Anime-/Streaming-Studio</option><option value="corridor">3 · Sci-Fi-Korridor</option></select></label>
+            <small class="avatar-note">Alle drei Varianten nutzen mehrere echte Tiefenebenen. Der Sci-Fi-Korridor betont die Parallaxe am stärksten.</small>
             <label for="avatar-animation"><span>Avatar-Animation</span><select id="avatar-animation"><option value="idle" selected>Idle</option><option value="walk">Walk</option><option value="jump">Jump</option></select></label>
             <small class="avatar-note">Gesichtsmimik wird bei aktiver Webcam aus den MediaPipe-Blendshapes übernommen. Die Morph-Schnittstelle ist zugleich für spätere TTS-Viseme vorbereitet.</small>
           </div>

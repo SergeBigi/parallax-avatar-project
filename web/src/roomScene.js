@@ -1,5 +1,6 @@
 import * as THREE from "three";
 
+import { createRoomStyles } from "./roomStyles.js";
 import { createTestChanAvatar } from "./testChanAvatar.js";
 
 /** A stationary miniature room, with its open front on the display at z = 0. */
@@ -8,19 +9,17 @@ export function createRoomScene(
   { onAvatarStatus = () => {}, loadAvatar = typeof window !== "undefined" } = {},
 ) {
   scene.name = "Miniature room scene";
-  scene.background = new THREE.Color(0x182a35);
+  scene.background = new THREE.Color(0x091219);
   const room = new THREE.Group();
   room.name = "Room architecture";
   scene.add(room);
 
-  const material = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.9 });
-  const wallMaterial = material(0x53757d);
-  const backMaterial = material(0x708d91);
-  const floorMaterial = material(0xb79a73);
-  const ceilingMaterial = material(0x344f5a);
-  const trimMaterial = material(0xc4d2cf);
-  const accentMaterial = material(0xd9ad6d);
-  const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
+  const material = (color, roughness = 0.88, metalness = 0.03) =>
+    new THREE.MeshStandardMaterial({ color, roughness, metalness });
+  const wallMaterial = material(0x17242c);
+  const backMaterial = material(0x0c151c, 0.82, 0.08);
+  const floorMaterial = material(0x1c252a, 0.92, 0.02);
+  const ceilingMaterial = material(0x101a21, 0.86, 0.05);
 
   function wall(name, width, height, position, rotation, surface) {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), surface);
@@ -32,52 +31,32 @@ export function createRoomScene(
     return mesh;
   }
 
-  function trim(name, size, position, surface = trimMaterial) {
-    const mesh = new THREE.Mesh(boxGeometry, surface);
-    mesh.name = name;
-    mesh.scale.set(...size);
-    mesh.position.set(...position);
-    room.add(mesh);
-  }
-
   wall("Room back wall", 1, 1, [0, 0, -1], [0, 0, 0], backMaterial);
   wall("Room left wall", 1, 1, [-0.5, 0, -0.5], [0, Math.PI / 2, 0], wallMaterial);
   wall("Room right wall", 1, 1, [0.5, 0, -0.5], [0, -Math.PI / 2, 0], wallMaterial);
   wall("Room floor", 1, 1, [0, -0.5, -0.5], [-Math.PI / 2, 0, 0], floorMaterial);
   wall("Room ceiling", 1, 1, [0, 0.5, -0.5], [Math.PI / 2, 0, 0], ceilingMaterial);
 
-  for (const z of [0, -0.25, -0.5, -0.75, -0.995]) {
-    for (const x of [-0.495, 0.495]) trim("Wall rib", [0.012, 1, 0.004], [x, 0, z]);
-    trim("Ceiling rib", [1, 0.012, 0.004], [0, 0.495, z]);
-  }
-  for (const x of [-0.492, 0.492]) {
-    trim("Skirting board", [0.018, 0.025, 1], [x, -0.482, -0.5]);
-    trim("Wall accent rail", [0.006, 0.012, 1], [x, -0.12, -0.5], accentMaterial);
-  }
-  trim("Back skirting board", [1, 0.025, 0.006], [0, -0.482, -0.995]);
-  trim("Back accent rail", [1, 0.012, 0.006], [0, -0.12, -0.995], accentMaterial);
-
+  // Subtle floor joints stay in every design and make the z-axis easy to read.
   const joints = [];
-  for (let i = 1; i < 10; i += 1) {
-    const z = -i / 10;
+  for (let i = 1; i < 9; i += 1) {
+    const z = -i / 9;
     joints.push(-0.5, -0.499, z, 0.5, -0.499, z);
   }
-  for (let i = 1; i < 8; i += 1) {
-    const x = -0.5 + i / 8;
+  for (const x of [-0.32, -0.16, 0, 0.16, 0.32]) {
     joints.push(x, -0.499, 0, x, -0.499, -1);
   }
   const jointGeometry = new THREE.BufferGeometry();
   jointGeometry.setAttribute("position", new THREE.Float32BufferAttribute(joints, 3));
   const floorJoints = new THREE.LineSegments(
     jointGeometry,
-    new THREE.LineBasicMaterial({ color: 0x79684f, transparent: true, opacity: 0.65 }),
+    new THREE.LineBasicMaterial({ color: 0x52656d, transparent: true, opacity: 0.32 }),
   );
   floorJoints.name = "Floor depth grid";
   room.add(floorJoints);
 
-  trim("Back panel", [0.42, 0.43, 0.009], [0, 0.08, -0.991], material(0x365962));
-  for (const x of [-0.217, 0.217]) trim("Back panel frame", [0.014, 0.458, 0.014], [x, 0.08, -0.982], accentMaterial);
-  for (const y of [-0.142, 0.302]) trim("Back panel frame", [0.448, 0.014, 0.014], [0, y, -0.982], accentMaterial);
+  // Three selectable environments share the same calibrated room shell.
+  const roomStyles = createRoomStyles(room);
 
   const doll = createDoll();
   scene.add(doll);
@@ -94,16 +73,16 @@ export function createRoomScene(
   avatar.object.visible = false;
   scene.add(avatar.object);
 
-  scene.add(new THREE.HemisphereLight(0xe4f3ff, 0x776046, 1.5));
-  const key = new THREE.DirectionalLight(0xffefd8, 2.4);
+  scene.add(new THREE.HemisphereLight(0xbdd9e5, 0x101217, 1.15));
+  const key = new THREE.DirectionalLight(0xd9f2ff, 1.9);
   key.name = "Room key light";
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
   key.shadow.bias = -0.0002;
   key.shadow.normalBias = 0.0003;
   scene.add(key, key.target);
-  const fill = new THREE.DirectionalLight(0xb6e7f0, 0.65);
-  fill.position.set(0.4, 0.1, 0.2);
+  const fill = new THREE.DirectionalLight(0x6fded5, 0.48);
+  fill.position.set(0.45, 0.12, 0.15);
   scene.add(fill);
 
   let previousLayout = "";
@@ -122,20 +101,19 @@ export function createRoomScene(
 
     room.scale.set(screenWidth, screenHeight, roomDepth);
 
-    // Keep the fallback doll as a full-body depth reference.
+    // Keep the fallback doll as a full-body depth reference while Test-Chan loads.
     const dollHeight = Math.min(screenHeight * 0.72, screenWidth * 0.6);
     doll.scale.setScalar(dollHeight);
     doll.position.set(-screenWidth * 0.035, -screenHeight / 2, -roomDepth * 0.48);
 
-    // Test-Chan is intentionally framed as a close bust shot and placed just
-    // behind the display plane. The large near/far separation to the back wall
-    // makes head movement produce a much stronger room-depth impression.
+    // Test-Chan stays immediately behind the display plane. The room designs
+    // deliberately place strong geometry much farther back for maximum parallax.
     const avatarHeight = Math.min(screenHeight * 0.9, screenWidth * 0.75);
     avatar.object.scale.setScalar(avatarHeight);
     avatar.object.position.set(0, -screenHeight * 0.7, -roomDepth * 0.09);
 
-    key.position.set(-screenWidth * 0.7, screenHeight * 1.8, roomDepth * 0.35);
-    key.target.position.set(0, -screenHeight * 0.2, -roomDepth * 0.5);
+    key.position.set(-screenWidth * 0.65, screenHeight * 1.55, roomDepth * 0.22);
+    key.target.position.set(0, -screenHeight * 0.12, -roomDepth * 0.12);
     const span = Math.max(screenWidth, screenHeight, roomDepth) * 0.9;
     Object.assign(key.shadow.camera, { left: -span, right: span, top: span, bottom: -span, near: 0.01, far: span * 6 });
     key.shadow.camera.updateProjectionMatrix();
@@ -151,6 +129,8 @@ export function createRoomScene(
   return {
     update,
     setDollVisible(visible) { characterVisible = visible; syncCharacterVisibility(); },
+    setRoomStyle(style) { return roomStyles.setStyle(style); },
+    getRoomStyle() { return roomStyles.getStyle(); },
     applyAvatarMorphs(values) { return avatar.applyNamedMorphs(values); },
   };
 }
