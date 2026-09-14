@@ -53,7 +53,6 @@ function buildFuturisticStudio() {
   const blue = glow(0x2f8faa, 0.58);
   const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
 
-  // Three architectural layers provide obvious near/mid/far references.
   for (const [z, opacity] of [[-0.2, 0.95], [-0.52, 0.78], [-0.82, 0.6]]) {
     const layerMaterial = glow(0x4bd9d0, opacity);
     addArch(group, boxGeometry, z, 0.025, layerMaterial);
@@ -80,20 +79,22 @@ function buildStreamingStudio() {
   const aqua = glow(0x6bd9d1, 0.58);
   const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
 
-  // Near side columns make the portrait feel framed without blocking the avatar.
   for (const x of [-0.455, 0.455]) {
     addBox(group, boxGeometry, "Streaming near column", [0.055, 0.78, 0.07], [x, -0.04, -0.2], cabinet);
     addBox(group, boxGeometry, "Streaming column light", [0.012, 0.56, 0.014], [x * 0.985, 0.02, -0.155], aqua);
   }
 
-  // Mid-depth floating shelves and props intentionally sit at different z values.
   for (const side of [-1, 1]) {
     const x = side * 0.34;
     addBox(group, boxGeometry, "Streaming shelf upper", [0.24, 0.025, 0.14], [x, 0.19, -0.5], shelf);
     addBox(group, boxGeometry, "Streaming shelf lower", [0.22, 0.025, 0.12], [x, -0.09, -0.66], shelf);
-    addBox(group, boxGeometry, "Streaming prop", [0.065, 0.11, 0.07], [x - side * 0.055, 0.255, -0.49], side < 0 ? warm : aqua);
-    addBox(group, boxGeometry, "Streaming prop small", [0.05, 0.07, 0.05], [x + side * 0.06, -0.04, -0.64], side < 0 ? aqua : warm);
   }
+
+  addFlower(group, [-0.39, 0.204, -0.455], 0xff8db4, "Streaming flower left");
+  addPictureFrame(group, [-0.285, 0.203, -0.446], 0.085, 0x72d8ff, "Streaming picture frame left");
+  addPictureFrame(group, [0.30, 0.203, -0.446], 0.09, 0xffbd75, "Streaming picture frame right");
+  addFlower(group, [0.395, -0.078, -0.615], 0x84e4d6, "Streaming flower right");
+  addGeometricSculpture(group, [-0.325, -0.073, -0.615]);
 
   addBox(group, boxGeometry, "Streaming back screen", [0.48, 0.34, 0.025], [0, 0.08, -0.965], screen);
   addBox(group, boxGeometry, "Streaming back top light", [0.5, 0.012, 0.012], [0, 0.265, -0.947], warm);
@@ -120,7 +121,6 @@ function buildSciFiCorridor() {
     addBox(group, boxGeometry, "Corridor right light", [0.009, 0.68 - index * 0.035, 0.012], [0.455 - inset, 0, z + 0.018], light);
   });
 
-  // Long rails exaggerate motion along the depth axis while staying very cheap to render.
   for (const x of [-0.31, -0.16, 0.16, 0.31]) {
     addBox(group, boxGeometry, "Corridor floor rail", [0.008, 0.007, 0.78], [x, -0.492, -0.53], x < 0 ? cyan : violet);
   }
@@ -151,7 +151,17 @@ function addBox(group, geometry, name, size, position, material) {
   mesh.name = name;
   mesh.scale.set(...size);
   mesh.position.set(...position);
+  configureShadows(mesh, material);
   group.add(mesh);
+  return mesh;
+}
+
+function configureShadows(mesh, material = mesh.material) {
+  const lit = Array.isArray(material)
+    ? material.some((entry) => entry?.isMeshStandardMaterial || entry?.isMeshPhysicalMaterial)
+    : material?.isMeshStandardMaterial || material?.isMeshPhysicalMaterial;
+  mesh.castShadow = Boolean(lit);
+  mesh.receiveShadow = Boolean(lit);
   return mesh;
 }
 
@@ -184,4 +194,88 @@ function addHexagon(group, z, radius, material) {
   line.name = "Back hexagon";
   line.position.z = z;
   group.add(line);
+}
+
+function addPictureFrame(group, position, size, accentColor, name) {
+  const frame = namedGroup(name);
+  frame.position.set(...position);
+  const border = standard(0x9a7f62, 0.62, 0.08);
+  const backing = standard(0x10161b, 0.88, 0.02);
+  const art = standard(accentColor, 0.72, 0.03);
+  const box = new THREE.BoxGeometry(1, 1, 1);
+  const width = size;
+  const height = size * 1.22;
+  const t = size * 0.09;
+  addBox(frame, box, `${name} left`, [t, height, 0.014], [-width / 2, height / 2, 0], border);
+  addBox(frame, box, `${name} right`, [t, height, 0.014], [width / 2, height / 2, 0], border);
+  addBox(frame, box, `${name} top`, [width + t, t, 0.014], [0, height, 0], border);
+  addBox(frame, box, `${name} bottom`, [width + t, t, 0.014], [0, 0, 0], border);
+  addBox(frame, box, `${name} backing`, [width * 0.9, height * 0.88, 0.009], [0, height * 0.51, -0.006], backing);
+  addBox(frame, box, `${name} art`, [width * 0.56, height * 0.28, 0.01], [-width * 0.08, height * 0.55, 0.003], art);
+  addBox(frame, box, `${name} art accent`, [width * 0.24, height * 0.17, 0.011], [width * 0.18, height * 0.37, 0.004], standard(0xf1e6c8, 0.86, 0.01));
+  group.add(frame);
+}
+
+function addFlower(group, position, petalColor, name) {
+  const flower = namedGroup(name);
+  flower.position.set(...position);
+  const potMaterial = standard(0x9e6a55, 0.82, 0.02);
+  const stemMaterial = standard(0x4c8b62, 0.9, 0.01);
+  const petalMaterial = standard(petalColor, 0.78, 0.01);
+  const centreMaterial = standard(0xf6cf67, 0.72, 0.01);
+
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.031, 0.054, 10), potMaterial);
+  pot.name = `${name} pot`;
+  pot.position.y = 0.027;
+  configureShadows(pot);
+  flower.add(pot);
+
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.005, 0.082, 7), stemMaterial);
+  stem.name = `${name} stem`;
+  stem.position.y = 0.088;
+  configureShadows(stem);
+  flower.add(stem);
+
+  const headY = 0.137;
+  const petalGeometry = new THREE.SphereGeometry(1, 8, 6);
+  for (let index = 0; index < 6; index += 1) {
+    const angle = (index / 6) * Math.PI * 2;
+    const petal = new THREE.Mesh(petalGeometry, petalMaterial);
+    petal.name = `${name} petal`;
+    petal.scale.set(0.015, 0.022, 0.008);
+    petal.position.set(Math.cos(angle) * 0.019, headY + Math.sin(angle) * 0.021, 0);
+    petal.rotation.z = angle - Math.PI / 2;
+    configureShadows(petal);
+    flower.add(petal);
+  }
+  const centre = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), centreMaterial);
+  centre.name = `${name} centre`;
+  centre.position.set(0, headY, 0.006);
+  configureShadows(centre);
+  flower.add(centre);
+
+  const leaf = new THREE.Mesh(petalGeometry, stemMaterial);
+  leaf.name = `${name} leaf`;
+  leaf.scale.set(0.012, 0.026, 0.006);
+  leaf.position.set(0.012, 0.085, 0);
+  leaf.rotation.z = -0.65;
+  configureShadows(leaf);
+  flower.add(leaf);
+  group.add(flower);
+}
+
+function addGeometricSculpture(group, position) {
+  const sculpture = namedGroup("Streaming geometric sculpture");
+  sculpture.position.set(...position);
+  const material = standard(0x77cfd3, 0.38, 0.42);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.033, 0.025, 10), standard(0x343f46, 0.74, 0.15));
+  base.position.y = 0.0125;
+  configureShadows(base);
+  sculpture.add(base);
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.038, 0), material);
+  gem.position.y = 0.064;
+  gem.rotation.set(0.25, 0.4, 0.12);
+  configureShadows(gem);
+  sculpture.add(gem);
+  group.add(sculpture);
 }
