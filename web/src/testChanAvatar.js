@@ -43,7 +43,14 @@ export function createTestChanAvatar({ modelUrl = DEFAULT_URL, onStatus = () => 
   let previousFace = null;
   let ready = false;
 
-  if (autoload) load();
+  const mobileSafeMode = Boolean(globalThis.__PARALLAX_MOBILE_SAFE__);
+  if (autoload && !mobileSafeMode) load();
+  else if (mobileSafeMode) {
+    onStatus({
+      state: "mobile-safe",
+      message: "Mobiler Sicherheitsmodus · leichter Avatar aktiv",
+    });
+  }
 
   function load() {
     onStatus({ state: "loading", message: "Test-Chan wird geladen …" });
