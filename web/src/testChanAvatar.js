@@ -46,10 +46,13 @@ export function createTestChanAvatar({ modelUrl = DEFAULT_URL, onStatus = () => 
   const mobileSafeMode = Boolean(globalThis.__PARALLAX_MOBILE_SAFE__);
   if (autoload && !mobileSafeMode) load();
   else if (mobileSafeMode) {
-    onStatus({
+    // Defer the callback until the caller has received and assigned this avatar.
+    // roomScene reacts to non-loading status by synchronizing visibility and would
+    // otherwise access its `avatar` binding while it is still being initialized.
+    queueMicrotask(() => onStatus({
       state: "mobile-safe",
       message: "Mobiler Sicherheitsmodus · leichter Avatar aktiv",
-    });
+    }));
   }
 
   function load() {
