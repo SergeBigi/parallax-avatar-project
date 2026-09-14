@@ -6,6 +6,16 @@ const DEFAULT_URL = `${(import.meta.env?.BASE_URL ?? "/")}models/test-chan/Test-
 const RELAXED_ARM_ANGLE = Math.PI / 2;
 const PORTRAIT_SCALE = 2.3;
 const PORTRAIT_OFFSET_Y = -0.96;
+const LIT_MATERIALS = new Map([
+  ["body", { roughness: 0.86, metalness: 0 }],
+  ["face", { roughness: 0.92, metalness: 0 }],
+  ["hair", { roughness: 0.48, metalness: 0.02 }],
+  ["hairback", { roughness: 0.52, metalness: 0.02 }],
+  ["shirt", { roughness: 0.78, metalness: 0 }],
+  ["shorts", { roughness: 0.8, metalness: 0 }],
+  ["shoes", { roughness: 0.52, metalness: 0.08 }],
+  ["glasses", { roughness: 0.32, metalness: 0.28 }],
+]);
 const BONE_NAMES = {
   chest: ["J_Bip_C_Chest", "Chest", "UpperChest"],
   head: ["J_Bip_C_Head", "Head"],
@@ -42,11 +52,7 @@ export function createTestChanAvatar({ modelUrl = DEFAULT_URL, onStatus = () => 
       model.name = "Test-Chan model";
       if (gltf.parser?.json?.extensions?.VRM) model.rotation.y = Math.PI;
       fitToUnitHeight(model);
-      model.traverse((object) => {
-        if (!object.isMesh) return;
-        object.castShadow = false;
-        object.receiveShadow = false;
-      });
+      enhanceAvatarLighting(model);
       motion.add(model);
       morphs = indexMorphTargets(model);
       bones = findBones(model);
@@ -67,9 +73,7 @@ export function createTestChanAvatar({ modelUrl = DEFAULT_URL, onStatus = () => 
     motion.position.y = 0;
     animate(animation, elapsedSeconds, bones, motion, bases);
     if (previousFace !== faceBlendshapes) {
-      if (previousFace?.length) {
-        applyFaceBlendshapes(morphs, previousFace, 0);
-      }
+      if (previousFace?.length) applyFaceBlendshapes(morphs, previousFace, 0);
       applyFaceBlendshapes(morphs, faceBlendshapes);
       previousFace = faceBlendshapes;
     }
@@ -83,6 +87,53 @@ export function createTestChanAvatar({ modelUrl = DEFAULT_URL, onStatus = () => 
     isReady: () => ready,
     applyNamedMorphs: (values) => applyNamedMorphs(morphs, values),
   };
+}
+
+export function enhanceAvatarLighting(model) {
+  const converted = new Map();
+  model.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+    if (Array.isArray(object.material)) {
+      object.material = object.material.map((material) => convertAvatarMaterial(material, converted));
+    } else {
+      object.material = convertAvatarMaterial(object.material, converted);
+    }
+  });
+  return model;
+}
+
+function convertAvatarMaterial(material, cache) {
+  if (!material) return material;
+  if (cache.has(material)) return cache.get(material);
+  const profile = LIT_MATERIALS.get(clean(material.name));
+  if (!profile || material.isMeshStandardMaterial || material.isMeshPhysicalMaterial) {
+    cache.set(material, material);
+    return material;
+  }
+
+  const lit = new THREE.MeshStandardMaterial({
+    name: material.name,
+    color: material.color?.clone?.() ?? new THREE.Color(0xffffff),
+    map: material.map ?? null,
+    alphaMap: material.alphaMap ?? null,
+    transparent: material.transparent,
+    opacity: material.opacity,
+    alphaTest: material.alphaTest,
+    side: material.side,
+    depthWrite: material.depthWrite,
+    depthTest: material.depthTest,
+    blending: material.blending,
+    vertexColors: material.vertexColors,
+    roughness: profile.roughness,
+    metalness: profile.metalness,
+  });
+  lit.premultipliedAlpha = material.premultipliedAlpha;
+  lit.toneMapped = material.toneMapped;
+  lit.needsUpdate = true;
+  cache.set(material, lit);
+  return lit;
 }
 
 function fitToUnitHeight(model) {
@@ -127,9 +178,6 @@ function clean(name) {
 function animate(mode, time, bones, motion, bases) {
   const wave = Math.sin(time * (mode === "walk" ? 6.2 : 1.7));
   if (mode === "walk") {
-    // Both arms start in the relaxed down pose. The same local Y rotation makes
-    // them swing in opposite front/back directions because the bones point in
-    // opposite X directions in Test-Chan's humanoid skeleton.
     rotate(bones.leftArm, bases, 0, wave * 0.34, 0);
     rotate(bones.rightArm, bases, 0, wave * 0.34, 0);
     rotate(bones.leftLeg, bases, wave * 0.42, 0, 0);
