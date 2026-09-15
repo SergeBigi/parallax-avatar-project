@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-import { computeOffAxisFrustum, estimateEyePosition, ExponentialPoseFilter } from "./projectionMath.js";
+import { computeOffAxisFrustum, estimateEyePosition, ExponentialPoseFilter, poseTuningFromControls } from "./projectionMath.js";
 import { createParallaxScene } from "./scene.js";
 import { TrackingClient } from "./trackingClient.js";
 import "./style.css";
@@ -55,6 +55,8 @@ const controlDefinitions = {
   ipd: { input: "ipd", output: "ipd-output", suffix: " mm", fallback: 64 },
   fov: { input: "fov", output: "fov-output", suffix: "°", fallback: 60 },
   smoothing: { input: "smoothing", output: "smoothing-output", suffix: " ms", fallback: 60 },
+  jitterDeadband: { input: "jitter-deadband", output: "jitter-deadband-output", suffix: " mm", fallback: 3 },
+  depthResponse: { input: "depth-response", output: "depth-response-output", suffix: " %", fallback: 45 },
   roomDepth: { input: "room-depth", output: "room-depth-output", suffix: " cm", fallback: 45 },
 };
 
@@ -111,7 +113,7 @@ elements.viewport.addEventListener("pointermove", (event) => {
 elements.viewport.addEventListener("wheel", (event) => {
   if (!elements.mouseMode.checked || event.target !== elements.canvas) return;
   event.preventDefault();
-  targetPose.z = THREE.MathUtils.clamp(targetPose.z + event.deltaY * 0.0005, 0.3, 1.5);
+  targetPose = { ...targetPose, z: THREE.MathUtils.clamp(targetPose.z + event.deltaY * 0.0005, 0.3, 1.5) };
 }, { passive: false });
 
 elements.cameraButton.addEventListener("click", startWebcamTracking);
@@ -185,6 +187,8 @@ function applySceneSelection() {
 }
 
 function readCalibration() {
+  const jitterDeadbandMeters = Number(controls.jitterDeadband.input.value) / 1000;
+  const depthResponse = Number(controls.depthResponse.input.value) / 100;
   return {
     screenWidth: Number(controls.screenWidth.input.value) / 1000,
     screenHeight: Number(controls.screenHeight.input.value) / 1000,
@@ -192,6 +196,9 @@ function readCalibration() {
     ipdMeters: Number(controls.ipd.input.value) / 1000,
     horizontalFovDegrees: Number(controls.fov.input.value),
     smoothingSeconds: Number(controls.smoothing.input.value) / 1000,
+    jitterDeadbandMeters,
+    depthResponse,
+    poseTuning: poseTuningFromControls(jitterDeadbandMeters, depthResponse),
     roomDepth: Number(controls.roomDepth.input.value) / 100,
     mirrorX: elements.mirrorX.checked,
     mirrorZ: elements.mirrorZ.checked,
@@ -302,9 +309,9 @@ function scheduleTracking() {
   const tick = async () => {
     const started = performance.now();
     await updateTracking(started);
-    // 30 Hz maximum in a worker, 20 Hz in the blocking compatibility fallback.
-    // A slow device processes only the next available frame, never a queue.
-    if (cameraStream) trackingTimer = setTimeout(tick, Math.max(0, (trackingClient ? 1000 / 30 : 50) - (performance.now() - started)));
+    // Tracking measurements are capped at 20 Hz. Rendering keeps running at
+    // display refresh rate and interpolates between these measurements.
+    if (cameraStream) trackingTimer = setTimeout(tick, Math.max(0, 50 - (performance.now() - started)));
   };
   trackingTimer = setTimeout(tick, 0);
 }
@@ -369,7 +376,7 @@ function renderFrame(now) {
   const deltaSeconds = Math.min((now - lastFrameTimestamp) / 1000, 0.1);
   lastFrameTimestamp = now;
 
-  const eye = poseFilter.update(targetPose, deltaSeconds, calibration.smoothingSeconds);
+  const eye = poseFilter.update(targetPose, deltaSeconds, calibration.smoothingSeconds, calibration.poseTuning);
   const frustum = computeOffAxisFrustum({ eye, screenWidth: calibration.screenWidth, screenHeight: calibration.screenHeight, near: 0.01, far: 10 });
   camera.position.set(eye.x, eye.y, eye.z);
   camera.rotation.set(0, 0, 0);
