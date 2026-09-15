@@ -126,13 +126,18 @@ export class ExponentialPoseFilter {
     this.zSmoothingMultiplier = zSmoothingMultiplier;
   }
 
-  update(target, deltaSeconds, timeConstantSeconds) {
+  update(target, deltaSeconds, timeConstantSeconds, tuning = {}) {
+    const xyDeadbandMeters = tuning.xyDeadbandMeters ?? this.xyDeadbandMeters;
+    const zDeadbandMeters = tuning.zDeadbandMeters ?? this.zDeadbandMeters;
+    const minimumZSmoothingSeconds = tuning.minimumZSmoothingSeconds ?? this.minimumZSmoothingSeconds;
+    const zSmoothingMultiplier = tuning.zSmoothingMultiplier ?? this.zSmoothingMultiplier;
+
     // targetPose is replaced whenever a new MediaPipe measurement arrives. Do
     // the deadband work only once per measurement, not once per render frame.
     if (target !== this.lastMeasurement) {
-      this.target.x = followOutsideDeadband(this.target.x, target.x, this.xyDeadbandMeters);
-      this.target.y = followOutsideDeadband(this.target.y, target.y, this.xyDeadbandMeters);
-      this.target.z = followOutsideDeadband(this.target.z, target.z, this.zDeadbandMeters);
+      this.target.x = followOutsideDeadband(this.target.x, target.x, xyDeadbandMeters);
+      this.target.y = followOutsideDeadband(this.target.y, target.y, xyDeadbandMeters);
+      this.target.z = followOutsideDeadband(this.target.z, target.z, zDeadbandMeters);
       this.lastMeasurement = target;
     }
 
@@ -146,8 +151,8 @@ export class ExponentialPoseFilter {
 
     const xyAlpha = 1 - Math.exp(-dt / timeConstantSeconds);
     const zTimeConstant = Math.max(
-      this.minimumZSmoothingSeconds,
-      timeConstantSeconds * this.zSmoothingMultiplier,
+      minimumZSmoothingSeconds,
+      timeConstantSeconds * zSmoothingMultiplier,
     );
     const zAlpha = 1 - Math.exp(-dt / zTimeConstant);
     this.value.x += (this.target.x - this.value.x) * xyAlpha;
