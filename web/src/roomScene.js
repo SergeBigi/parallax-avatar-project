@@ -180,8 +180,9 @@ export function createRoomScene(
     setRoomStyle(style) { return roomStyles.setStyle(style); },
     getRoomStyle() { return roomStyles.getStyle(); },
     async importRoom(buffer, name) {
-      roomStyles.setStyle("imported");
-      return importedRoom.install(buffer, name);
+      const loaded = await importedRoom.install(buffer, name);
+      if (loaded) roomStyles.setStyle("imported");
+      return loaded;
     },
     setRoomView(view) { importedRoom.setView(view); },
     applyAvatarMorphs(values) { return avatar.applyNamedMorphs(values); },
