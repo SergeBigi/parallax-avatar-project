@@ -1,30 +1,18 @@
-import { detectRuntimeProfile } from "./deviceMode.js";
 import { installSpaceFreezeDemo } from "./freezeDemo.js";
 
-const profile = detectRuntimeProfile({
-  userAgent: navigator.userAgent ?? "",
-  platform: navigator.platform ?? "",
-  maxTouchPoints: navigator.maxTouchPoints ?? 0,
-});
+const userAgent = navigator.userAgent ?? "";
+const isIOS = /iPad|iPhone|iPod/.test(userAgent)
+  || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-globalThis.__PARALLAX_MOBILE_SAFE__ = profile.mobileSafe;
-globalThis.__PARALLAX_ECHO_SAFE__ = profile.isEchoSafe;
+globalThis.__PARALLAX_MOBILE_SAFE__ = isIOS;
 
-if (profile.mobileSafe) {
+if (isIOS) {
   try {
     const key = "parallax-view-calibration-v1";
     const saved = JSON.parse(localStorage.getItem(key) ?? "{}");
     localStorage.setItem(key, JSON.stringify({ ...saved, renderQuality: "0.75" }));
-
-    if (profile.isEchoSafe) {
-      // Do not restore a previously imported heavy GLB on constrained Fire/Silk
-      // hardware. Start from the lightweight built-in room for a stable baseline.
-      localStorage.setItem("parallax-room-style-v1", "studio");
-      const echoSettings = JSON.parse(localStorage.getItem(key) ?? "{}");
-      localStorage.setItem(key, JSON.stringify({ ...echoSettings, scene: "room-doll" }));
-    }
   } catch {
-    // Local storage is optional. The app still uses the safe rendering path.
+    // Local storage is optional. The app still uses the mobile-safe avatar path.
   }
 }
 
