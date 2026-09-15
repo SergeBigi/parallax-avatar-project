@@ -95,3 +95,10 @@ test("hiding the doll preserves the room and changing room depth refreshes stati
   assert.equal(room.update({ roomDepth: 0.8 }), false);
   assert.equal(room.update({ roomDepth: 0.15 }), true);
 });
+
+test("a failed GLB import keeps the previously selected room style", async () => {
+  const room = createRoomScene(new THREE.Scene());
+  room.setRoomStyle("corridor");
+  assert.equal(await room.importRoom(new ArrayBuffer(5), "broken.glb"), false);
+  assert.equal(room.getRoomStyle(), "corridor");
+});
