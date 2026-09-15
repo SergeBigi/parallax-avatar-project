@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { computeOffAxisFrustum, estimateEyePosition, ExponentialPoseFilter, followOutsideDeadband } from "./projectionMath.js";
+import { computeOffAxisFrustum, estimateEyePosition, ExponentialPoseFilter, followOutsideDeadband, poseTuningFromControls } from "./projectionMath.js";
 
 test("centred eye produces a symmetric frustum", () => {
   const result = computeOffAxisFrustum({
@@ -70,6 +70,15 @@ test("deadband suppresses micro jitter but follows deliberate movement", () => {
   assert.equal(followOutsideDeadband(0, 0.002, 0.003), 0);
   assert.equal(followOutsideDeadband(0, -0.002, 0.003), 0);
   assert.ok(Math.abs(followOutsideDeadband(0, 0.013, 0.003) - 0.01) < 1e-12);
+});
+
+test("depth response changes only Z tuning", () => {
+  const calm = poseTuningFromControls(0.003, 0.3);
+  const direct = poseTuningFromControls(0.003, 1);
+  assert.equal(calm.xyDeadbandMeters, direct.xyDeadbandMeters);
+  assert.ok(calm.zDeadbandMeters > direct.zDeadbandMeters);
+  assert.ok(calm.minimumZSmoothingSeconds > direct.minimumZSmoothingSeconds);
+  assert.ok(calm.zSmoothingMultiplier > direct.zSmoothingMultiplier);
 });
 
 test("pose filter converges without overshooting", () => {
