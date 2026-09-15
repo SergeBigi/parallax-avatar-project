@@ -96,6 +96,19 @@ export function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
+/** Translate user-facing stability controls into axis-specific filter tuning. */
+export function poseTuningFromControls(xyDeadbandMeters = 0.003, depthResponse = 0.45) {
+  const response = clamp(Number(depthResponse) || 0.45, 0.2, 1);
+  return {
+    xyDeadbandMeters: Math.max(0, Number(xyDeadbandMeters) || 0),
+    // At low depth response, ignore more Z noise and use a longer Z-only time
+    // constant. X/Y responsiveness is deliberately unaffected.
+    zDeadbandMeters: 0.004 + (1 - response) * 0.016,
+    minimumZSmoothingSeconds: 0.07 + (1 - response) * 0.24,
+    zSmoothingMultiplier: 1 + (1 - response) * 3,
+  };
+}
+
 /**
  * Keep tiny measurement changes out of the rendered pose without adding the
  * large latency of a heavy low-pass filter. Once a movement leaves the quiet
