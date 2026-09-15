@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { computeOffAxisFrustum, estimateEyePosition, ExponentialPoseFilter } from "./projectionMath.js";
+import { computeOffAxisFrustum, estimateEyePosition, ExponentialPoseFilter, followOutsideDeadband } from "./projectionMath.js";
 
 test("centred eye produces a symmetric frustum", () => {
   const result = computeOffAxisFrustum({
@@ -66,11 +66,31 @@ test("right and left eye selections produce opposite monoscopic x offsets", () =
   assert.equal(right.z, left.z);
 });
 
+test("deadband suppresses micro jitter but follows deliberate movement", () => {
+  assert.equal(followOutsideDeadband(0, 0.002, 0.003), 0);
+  assert.equal(followOutsideDeadband(0, -0.002, 0.003), 0);
+  assert.ok(Math.abs(followOutsideDeadband(0, 0.013, 0.003) - 0.01) < 1e-12);
+});
+
 test("pose filter converges without overshooting", () => {
-  const filter = new ExponentialPoseFilter({ x: 0, y: 0, z: 0.5 });
+  const filter = new ExponentialPoseFilter({ x: 0, y: 0, z: 0.5 }, {
+    xyDeadbandMeters: 0,
+    zDeadbandMeters: 0,
+  });
   const result = filter.update({ x: 1, y: -1, z: 1 }, 0.016, 0.09);
 
   assert.ok(result.x > 0 && result.x < 1);
   assert.ok(result.y < 0 && result.y > -1);
   assert.ok(result.z > 0.5 && result.z < 1);
+});
+
+test("stationary tracking noise stays still and depth reacts slower than x/y", () => {
+  const filter = new ExponentialPoseFilter({ x: 0, y: 0, z: 0.65 });
+  const jittered = filter.update({ x: 0.0015, y: -0.001, z: 0.658 }, 0.016, 0.07);
+  assert.deepEqual(jittered, { x: 0, y: 0, z: 0.65 });
+
+  const moved = filter.update({ x: 0.05, y: 0.05, z: 0.8 }, 0.016, 0.07);
+  const xProgress = moved.x / (0.05 - 0.0025);
+  const zProgress = (moved.z - 0.65) / (0.8 - 0.012 - 0.65);
+  assert.ok(xProgress > zProgress, "depth uses a slower time constant than lateral movement");
 });
