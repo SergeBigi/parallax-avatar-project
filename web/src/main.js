@@ -58,6 +58,7 @@ const controlDefinitions = {
   jitterDeadband: { input: "jitter-deadband", output: "jitter-deadband-output", suffix: " mm", fallback: 3 },
   depthResponse: { input: "depth-response", output: "depth-response-output", suffix: " %", fallback: 45 },
   roomDepth: { input: "room-depth", output: "room-depth-output", suffix: " cm", fallback: 45 },
+  avatarDepth: { input: "avatar-depth", output: "avatar-depth-output", suffix: " cm", fallback: 2 },
 };
 
 const controls = Object.fromEntries(Object.entries(controlDefinitions).map(([key, definition]) => [key, {
@@ -200,6 +201,7 @@ function readCalibration() {
     depthResponse,
     poseTuning: poseTuningFromControls(jitterDeadbandMeters, depthResponse),
     roomDepth: Number(controls.roomDepth.input.value) / 100,
+    avatarDepth: Number(controls.avatarDepth.input.value) / 100,
     mirrorX: elements.mirrorX.checked,
     mirrorZ: elements.mirrorZ.checked,
     trackedEye: elements.trackedEye.value,
