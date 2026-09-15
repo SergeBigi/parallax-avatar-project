@@ -105,6 +105,7 @@ export function createRoomScene(
     screenWidth = 0.286,
     screenHeight = 0.191,
     roomDepth = 0.45,
+    avatarDepth = 0.02,
     elapsedSeconds = 0,
     avatarAnimation = "idle",
     faceBlendshapes = [],
@@ -128,7 +129,7 @@ export function createRoomScene(
       shadowsDirty = true;
     }
 
-    const layout = `${screenWidth}/${screenHeight}/${roomDepth}`;
+    const layout = `${screenWidth}/${screenHeight}/${roomDepth}/${avatarDepth}`;
     if (layout !== previousLayout) {
       previousLayout = layout;
       shadowsDirty = true;
@@ -140,7 +141,10 @@ export function createRoomScene(
 
       const avatarHeight = Math.min(screenHeight * 0.9, screenWidth * 0.75);
       avatar.object.scale.setScalar(avatarHeight);
-      avatar.object.position.set(0, -screenHeight * 0.7, -roomDepth * 0.09);
+      // z=0 is the physical display plane. Positive values place Test-Chan
+      // virtually in front of the display so its screen projection grows as
+      // the viewer approaches; negative values keep it inside the room.
+      avatar.object.position.set(0, -screenHeight * 0.7, THREE.MathUtils.clamp(avatarDepth, -0.08, 0.08));
 
       key.position.set(-screenWidth * 0.68, screenHeight * 1.62, roomDepth * 0.28);
       key.target.position.set(0, -screenHeight * 0.1, -roomDepth * 0.16);
