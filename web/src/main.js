@@ -9,6 +9,7 @@ const MEDIAPIPE_VERSION = "0.10.22-rc.20250304";
 const WASM_PATH = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`;
 const MODEL_PATH =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task";
+const ROOM_VIEW_KEY = "parallax-local-room-view-v1";
 const SETTINGS_KEY = "parallax-view-calibration-v1";
 const DEPTH_INVERSION_REFERENCE_METERS = 0.65;
 
@@ -29,6 +30,11 @@ const elements = {
   roomControls: document.querySelector("#room-controls"),
   avatarControls: document.querySelector("#avatar-controls"),
   avatarStatus: document.querySelector("#avatar-status"),
+  roomFile: document.querySelector("#room-file"),
+  roomStatus: document.querySelector("#room-status"),
+  roomAngle: document.querySelector("#room-angle"),
+  roomZoom: document.querySelector("#room-zoom"),
+  roomElevation: document.querySelector("#room-elevation"),
   panelToggle: document.querySelector("#panel-toggle"),
   panelContent: document.querySelector("#panel-content"),
   trackingStatus: document.querySelector("#tracking-status"),
@@ -68,7 +74,7 @@ renderer.shadowMap.autoUpdate = false;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 10);
 camera.rotation.set(0, 0, 0);
-const sceneController = createParallaxScene(scene, { onAvatarStatus: updateAvatarStatus });
+const sceneController = createParallaxScene(scene, { renderer, onAvatarStatus: updateAvatarStatus, onRoomStatus: updateRoomStatus, onRoomLoaded: updateRoomView });
 const poseFilter = new ExponentialPoseFilter({ x: 0, y: 0.095, z: 0.65 });
 
 let targetPose = { x: 0, y: 0.095, z: 0.65 };
@@ -146,6 +152,27 @@ function bindControls() {
   elements.mirrorZ.addEventListener("change", saveSettings);
   elements.trackedEye.addEventListener("change", saveSettings);
   elements.avatarAnimation.addEventListener("change", saveSettings);
+  elements.roomFile.addEventListener("change", async () => {
+    const file = elements.roomFile.files?.[0];
+    if (!file) return;
+    elements.roomFile.disabled = true;
+    try {
+      if (file.size > 64 * 1024 * 1024) throw new Error("Bitte eine GLB-Datei bis 64 MB auswählen.");
+      const buffer = await file.arrayBuffer();
+      if (await sceneController.importRoom(buffer, file.name)) {
+        elements.sceneSelect.value = "room-doll";
+        applySceneSelection(); saveSettings();
+      }
+    } catch (error) { updateRoomStatus({ state: "error", message: error.message }); }
+    finally { elements.roomFile.disabled = false; elements.roomFile.value = ""; }
+  });
+  for (const control of [elements.roomAngle, elements.roomZoom, elements.roomElevation]) {
+    control.addEventListener("input", () => {
+      const view = { angle: Number(elements.roomAngle.value), zoom: Number(elements.roomZoom.value), elevation: Number(elements.roomElevation.value) };
+      sceneController.setRoomView(view);
+      try { localStorage.setItem(ROOM_VIEW_KEY, JSON.stringify(view)); } catch { /* optional */ }
+    });
+  }
 }
 
 function applySceneSelection() {
@@ -376,6 +403,21 @@ function updateFps(now) {
     elements.trackingFps.textContent = (faceLandmarker || trackingClient) && !elements.mouseMode.checked ? `${Math.round((trackedFrames * 1000) / (now - trackingWindowStarted))} fps` : "–";
     trackedFrames = 0; trackingWindowStarted = now;
   }
+}
+function updateRoomStatus(status) {
+  elements.roomStatus.dataset.state = status.state;
+  elements.roomStatus.textContent = status.message;
+}
+function updateRoomView(view) {
+  if (view.restored) {
+    try { Object.assign(view, JSON.parse(localStorage.getItem(ROOM_VIEW_KEY) ?? "{}")); } catch { /* optional */ }
+  } else {
+    try { localStorage.removeItem(ROOM_VIEW_KEY); } catch { /* optional */ }
+  }
+  elements.roomAngle.value = String(view.angle);
+  elements.roomZoom.value = String(view.zoom);
+  elements.roomElevation.value = String(view.elevation);
+  sceneController.setRoomView(view);
 }
 function updateAvatarStatus(status) {
   if (!elements.avatarStatus) return;

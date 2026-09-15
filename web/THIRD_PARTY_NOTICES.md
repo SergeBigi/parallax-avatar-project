@@ -50,3 +50,17 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+# Locally imported living room
+
+Reference file supplied by the user: `living_room_interior_free.glb`.
+Embedded attribution: **living room interior FREE** by **dasy444**.
+Source: https://sketchfab.com/3d-models/living-room-interior-free-efeff8e4978e489e82dbb06a86f697f8
+Embedded license: **SKETCHFAB Standard**, https://sketchfab.com/licenses.
+
+The room is not distributed in this repository or in its Pages build. Each user
+imports their own licensed copy into their own browser. File data stays on that
+device; the app does not upload it. Import-time adaptations are display framing,
+texture sizing and local environment lighting. No authorship of this model is
+claimed by this project. This file is a different asset from the previously
+considered IKEA Showroom scan by Mr. Mushi.

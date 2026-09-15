@@ -507,3 +507,7 @@ input[type="range"] {
     transition-duration: 0.01ms !important;
   }
 }
+
+.room-file-label input { width: 100%; font-size: 0.8rem; }
+#room-status { overflow-wrap: anywhere; }
+#room-status[data-state="error"] { color: #ff9d93; }

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
 const STORAGE_KEY = "parallax-room-style-v1";
-export const ROOM_STYLE_IDS = Object.freeze(["studio", "stream", "corridor"]);
+export const ROOM_STYLE_IDS = Object.freeze(["studio", "stream", "corridor", "imported"]);
 
 export function createRoomStyles(room, { initialStyle = "studio", selector = null } = {}) {
   const styles = new Map([

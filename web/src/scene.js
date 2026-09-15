@@ -20,9 +20,9 @@ const BOXES = [
   [-0.0581, -0.0111, -0.0359, 0.01, 0.01, 0.05],
 ];
 
-export function createParallaxScene(scene, { onAvatarStatus = () => {} } = {}) {
+export function createParallaxScene(scene, { renderer, onAvatarStatus = () => {}, onRoomStatus = () => {}, onRoomLoaded = () => {} } = {}) {
   const roomScene = new THREE.Scene();
-  const room = createRoomScene(roomScene, { onAvatarStatus });
+  const room = createRoomScene(roomScene, { renderer, onAvatarStatus, onRoomStatus, onRoomLoaded });
   const boxScene = new THREE.Scene();
   boxScene.name = "Original bars scene";
   const box = createBoxScene(boxScene);
@@ -52,6 +52,8 @@ export function createParallaxScene(scene, { onAvatarStatus = () => {} } = {}) {
       shadowsDirty = false;
       return refreshShadows;
     },
+    importRoom(buffer, name) { return room.importRoom(buffer, name); },
+    setRoomView(view) { room.setRoomView(view); },
     applyAvatarMorphs(values) { return room.applyAvatarMorphs(values); },
   };
 }

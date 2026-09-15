@@ -3,8 +3,8 @@ import test from "node:test";
 
 import { normalizeRoomStyle, ROOM_STYLE_IDS } from "./roomStyles.js";
 
-test("all three room designs are selectable", () => {
-  assert.deepEqual(ROOM_STYLE_IDS, ["studio", "stream", "corridor"]);
+test("built-in designs and the imported room are selectable", () => {
+  assert.deepEqual(ROOM_STYLE_IDS, ["studio", "stream", "corridor", "imported"]);
   for (const id of ROOM_STYLE_IDS) assert.equal(normalizeRoomStyle(id), id);
 });
 

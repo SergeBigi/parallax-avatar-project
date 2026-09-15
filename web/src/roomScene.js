@@ -1,5 +1,6 @@
 import * as THREE from "three";
 
+import { createImportedRoom } from "./importedRoom.js";
 import { createRoomStyles } from "./roomStyles.js";
 import { createTestChanAvatar } from "./testChanAvatar.js";
 
@@ -8,7 +9,7 @@ const DYNAMIC_SHADOW_INTERVAL_SECONDS = 1 / 15;
 /** A stationary miniature room, with its open front on the display at z = 0. */
 export function createRoomScene(
   scene,
-  { onAvatarStatus = () => {}, loadAvatar = typeof window !== "undefined" } = {},
+  { renderer, onAvatarStatus = () => {}, onRoomStatus = () => {}, onRoomLoaded = () => {}, loadAvatar = typeof window !== "undefined" } = {},
 ) {
   scene.name = "Miniature room scene";
   scene.background = new THREE.Color(0x091219);
@@ -57,6 +58,9 @@ export function createRoomScene(
   room.add(floorJoints);
 
   const roomStyles = createRoomStyles(room);
+  const importedRoom = createImportedRoom(scene, { renderer, onStatus: onRoomStatus, onLoaded: onRoomLoaded });
+
+  const importedControls = typeof document !== "undefined" && document.querySelector("#imported-room-view");
 
   const doll = createDoll();
   scene.add(doll);
@@ -110,6 +114,15 @@ export function createRoomScene(
 
     let shadowsDirty = false;
     const currentStyle = roomStyles.getStyle();
+    const wantsImported = currentStyle === "imported";
+    if (wantsImported && typeof window !== "undefined") importedRoom.restore();
+    importedRoom.object.visible = wantsImported && importedRoom.isReady();
+    room.visible = !importedRoom.object.visible;
+    if (importedRoom.object.visible) {
+      shadowsDirty = importedRoom.update({ screenWidth, screenHeight, roomDepth }) || shadowsDirty;
+    }
+    if (importedControls) importedControls.hidden = !wantsImported;
+
     if (currentStyle !== previousStyle) {
       previousStyle = currentStyle;
       shadowsDirty = true;
@@ -166,6 +179,11 @@ export function createRoomScene(
     setDollVisible(visible) { characterVisible = visible; syncCharacterVisibility(); },
     setRoomStyle(style) { return roomStyles.setStyle(style); },
     getRoomStyle() { return roomStyles.getStyle(); },
+    async importRoom(buffer, name) {
+      roomStyles.setStyle("imported");
+      return importedRoom.install(buffer, name);
+    },
+    setRoomView(view) { importedRoom.setView(view); },
     applyAvatarMorphs(values) { return avatar.applyNamedMorphs(values); },
   };
 }

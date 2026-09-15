@@ -81,3 +81,32 @@ Webcam-Start aus dem Internet geladen; Kamerabilder bleiben lokal.
 
 Entwicklertests: `npm test` und `npm run build`. FPS hängen weiterhin von
 Grafikchip, Bildschirmgröße, Kamera, Browser und Energiesparmodus ab.
+
+## Eigener Wohnraum (GLB)
+
+Unter **Raumdesign → Eigener Wohnraum (GLB)** bzw. **Wohnraum öffnen** eine
+selbst enthaltene `.glb` auswählen. Der Raum erscheint mit dem vorhandenen Avatar
+und derselben Off-Axis-Projektion wie die bisherigen Raumdesigns. Der Import ist
+auch in der Szene ohne Avatar verfügbar. Blickrichtung, Raumgröße und Raumhöhe
+lassen sich anpassen; die Raumtiefe steuert weiterhin die Tiefe hinter dem Display.
+
+Die Datei wird ausschließlich im Browser gelesen und in IndexedDB gespeichert.
+Beim nächsten Besuch wird sie wieder geladen, wenn der eigene Wohnraum ausgewählt
+ist. Jedes Gerät und jeder Browser benötigt einen eigenen Import. Gelöschte
+Website-Daten oder privates Browsen können einen erneuten Import erforderlich
+machen. Wenn das Speichern fehlschlägt, bleibt der aktuelle Raum trotzdem nutzbar.
+Die Ausrichtung wird separat lokal gespeichert.
+
+Der Nutzerraum `living room interior FREE` von dasy444 wurde als Referenz getestet.
+Er hat rund 23.230 Dreiecke und enthält seine Texturen direkt in der GLB. Seine
+Standardlizenz erlaubt keine Weitergabe als frei zugängliche Modelldatei; deshalb
+gehört die Binärdatei nicht zum öffentlichen Repository oder zum Pages-Build.
+Die App liest auch keine Modelldatei von Sketchfab im Hintergrund nach.
+
+Der bestehende WebGL2-Pfad für Edge/Chrome auf Windows und Safari auf iOS bleibt
+erhalten. Texturen werden beim Import auf maximal 1024 Pixel Kantenlänge begrenzt,
+der statische Raum wird nicht in jedem Avatar-Schattenpass neu gerendert. Ein
+kleines lokal generiertes Umgebungslicht erhält die PBR-Materialien. Die bisherigen
+Tracking-, Spiegelungs- und Leistungsoptionen bleiben verfügbar. Die iOS-Auswahl
+des leichteren Avatars bleibt erhalten. Tatsächliche FPS auf dem Surface und dem
+iPhone müssen auf diesen Geräten gemessen werden.
