@@ -53,6 +53,8 @@
           <div class="control-list avatar-controls" id="avatar-controls" hidden>
             <p class="avatar-status" id="avatar-status" data-state="loading" role="status">Test-Chan wird geladen …</p>
             <label for="avatar-animation"><span>Avatar-Animation</span><select id="avatar-animation"><option value="idle" selected>Idle</option><option value="walk">Walk</option><option value="jump">Jump</option></select></label>
+            <label><span>Avatar-Tiefe <output id="avatar-depth-output">2 cm</output></span><input id="avatar-depth" type="range" min="-8" max="8" step="1" value="2" /></label>
+            <small class="avatar-note">Positive Werte setzen den Avatar virtuell vor die Displayebene. Dadurch kann er beim Annähern sichtbar größer wirken.</small>
             <small class="avatar-note">Gesichtsmimik wird bei aktiver Webcam aus den MediaPipe-Blendshapes übernommen. Die Morph-Schnittstelle ist zugleich für spätere TTS-Viseme vorbereitet.</small>
             <small class="avatar-note">Demo: Leertaste gedrückt halten = Bild einfrieren. Loslassen = sofort auf die aktuelle Kopfposition neu kalibrieren.</small>
           </div>
@@ -108,6 +110,7 @@
               jitterDeadband: 3,
               depthResponse: 45,
               roomDepth: 45,
+              avatarDepth: 2,
               mirrorX: true,
               mirrorZ: false,
               trackedEye: "left",
