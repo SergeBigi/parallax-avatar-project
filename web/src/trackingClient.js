@@ -1,9 +1,32 @@
 /** One frame in flight, including capture: never accumulate stale camera frames. */
+const DEFAULT_TRACKING_INTERVAL_MS = 50;
+const TRACKING_WIDTH = 384;
+const TRACKING_HEIGHT = 288;
+
+async function captureTrackingFrame(video) {
+  try {
+    return await createImageBitmap(video, {
+      resizeWidth: TRACKING_WIDTH,
+      resizeHeight: TRACKING_HEIGHT,
+      resizeQuality: "low",
+    });
+  } catch {
+    // Some browsers implement createImageBitmap without resize options.
+    return createImageBitmap(video);
+  }
+}
+
 export class TrackingClient {
-  constructor(worker, { capture = (video) => createImageBitmap(video), timeoutMs = 30000 } = {}) {
+  constructor(worker, {
+    capture = captureTrackingFrame,
+    timeoutMs = 30000,
+    minIntervalMs = DEFAULT_TRACKING_INTERVAL_MS,
+  } = {}) {
     this.worker = worker;
     this.capture = capture;
     this.timeoutMs = timeoutMs;
+    this.minIntervalMs = Math.max(0, minIntervalMs);
+    this.lastCaptureTimestamp = -Infinity;
     this.pending = null;
     this.busy = false;
     this.closed = false;
@@ -38,8 +61,9 @@ export class TrackingClient {
   }
 
   async detect(video, timestamp) {
-    if (this.busy || this.closed) return null;
+    if (this.busy || this.closed || timestamp - this.lastCaptureTimestamp < this.minIntervalMs) return null;
     this.busy = true;
+    this.lastCaptureTimestamp = timestamp;
     let bitmap;
     try {
       bitmap = await this.capture(video);
