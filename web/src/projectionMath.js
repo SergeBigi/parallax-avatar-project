@@ -96,21 +96,63 @@ export function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
+/**
+ * Keep tiny measurement changes out of the rendered pose without adding the
+ * large latency of a heavy low-pass filter. Once a movement leaves the quiet
+ * zone, only the part outside the zone is followed. This produces hysteresis
+ * around a stationary head while remaining responsive to intentional motion.
+ */
+export function followOutsideDeadband(current, measured, radius) {
+  if (!Number.isFinite(current) || !Number.isFinite(measured)) return current;
+  const deadband = Math.max(0, Number(radius) || 0);
+  const delta = measured - current;
+  if (Math.abs(delta) <= deadband) return current;
+  return measured - Math.sign(delta) * deadband;
+}
+
 export class ExponentialPoseFilter {
-  constructor(initialPose) {
+  constructor(initialPose, {
+    xyDeadbandMeters = 0.0025,
+    zDeadbandMeters = 0.012,
+    minimumZSmoothingSeconds = 0.16,
+    zSmoothingMultiplier = 2.4,
+  } = {}) {
     this.value = { ...initialPose };
+    this.target = { ...initialPose };
+    this.lastMeasurement = null;
+    this.xyDeadbandMeters = xyDeadbandMeters;
+    this.zDeadbandMeters = zDeadbandMeters;
+    this.minimumZSmoothingSeconds = minimumZSmoothingSeconds;
+    this.zSmoothingMultiplier = zSmoothingMultiplier;
   }
 
   update(target, deltaSeconds, timeConstantSeconds) {
+    // targetPose is replaced whenever a new MediaPipe measurement arrives. Do
+    // the deadband work only once per measurement, not once per render frame.
+    if (target !== this.lastMeasurement) {
+      this.target.x = followOutsideDeadband(this.target.x, target.x, this.xyDeadbandMeters);
+      this.target.y = followOutsideDeadband(this.target.y, target.y, this.xyDeadbandMeters);
+      this.target.z = followOutsideDeadband(this.target.z, target.z, this.zDeadbandMeters);
+      this.lastMeasurement = target;
+    }
+
+    const dt = Math.max(deltaSeconds, 0);
     if (timeConstantSeconds <= 0) {
-      this.value = { ...target };
+      this.value.x = this.target.x;
+      this.value.y = this.target.y;
+      this.value.z = this.target.z;
       return this.value;
     }
 
-    const alpha = 1 - Math.exp(-Math.max(deltaSeconds, 0) / timeConstantSeconds);
-    this.value.x += (target.x - this.value.x) * alpha;
-    this.value.y += (target.y - this.value.y) * alpha;
-    this.value.z += (target.z - this.value.z) * alpha;
+    const xyAlpha = 1 - Math.exp(-dt / timeConstantSeconds);
+    const zTimeConstant = Math.max(
+      this.minimumZSmoothingSeconds,
+      timeConstantSeconds * this.zSmoothingMultiplier,
+    );
+    const zAlpha = 1 - Math.exp(-dt / zTimeConstant);
+    this.value.x += (this.target.x - this.value.x) * xyAlpha;
+    this.value.y += (this.target.y - this.value.y) * xyAlpha;
+    this.value.z += (this.target.z - this.value.z) * zAlpha;
     return this.value;
   }
 }
