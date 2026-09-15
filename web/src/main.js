@@ -12,6 +12,8 @@ const MODEL_PATH =
 const ROOM_VIEW_KEY = "parallax-local-room-view-v1";
 const SETTINGS_KEY = "parallax-view-calibration-v1";
 const DEPTH_INVERSION_REFERENCE_METERS = 0.65;
+const ECHO_SAFE = Boolean(globalThis.__PARALLAX_ECHO_SAFE__);
+const ECHO_RENDER_INTERVAL_MS = 1000 / 30;
 
 const elements = {
   viewport: document.querySelector("#viewport"),
@@ -67,10 +69,15 @@ const controls = Object.fromEntries(Object.entries(controlDefinitions).map(([key
   output: document.querySelector(`#${definition.output}`),
 }]));
 
-const renderer = new THREE.WebGLRenderer({ canvas: elements.canvas, antialias: true, powerPreference: "high-performance" });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
+const renderer = new THREE.WebGLRenderer({
+  canvas: elements.canvas,
+  antialias: !ECHO_SAFE,
+  powerPreference: ECHO_SAFE ? "default" : "high-performance",
+  precision: ECHO_SAFE ? "mediump" : "highp",
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, ECHO_SAFE ? 0.5 : 1));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !ECHO_SAFE;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.shadowMap.autoUpdate = false;
 
@@ -94,6 +101,7 @@ let trackingWindowStarted = performance.now();
 let renderedFrames = 0;
 let renderWindowStarted = performance.now();
 let lastFrameTimestamp = performance.now();
+let lastEchoRenderTimestamp = -Infinity;
 let trackingBusy = false;
 let latestFaceBlendshapes = [];
 
@@ -155,9 +163,18 @@ function bindControls() {
   elements.mirrorZ.addEventListener("change", saveSettings);
   elements.trackedEye.addEventListener("change", saveSettings);
   elements.avatarAnimation.addEventListener("change", saveSettings);
+
+  if (ECHO_SAFE) {
+    const importedOption = document.querySelector('#room-style option[value="imported"]');
+    if (importedOption) importedOption.disabled = true;
+    elements.roomFile.disabled = true;
+    updateRoomStatus({ state: "empty", message: "Echo-Safe-Modus · GLB-Räume vorerst deaktiviert" });
+    elements.trackingBackend.textContent = "Echo/Silk Safe Mode";
+  }
+
   elements.roomFile.addEventListener("change", async () => {
     const file = elements.roomFile.files?.[0];
-    if (!file) return;
+    if (!file || ECHO_SAFE) return;
     elements.roomFile.disabled = true;
     try {
       if (file.size > 64 * 1024 * 1024) throw new Error("Bitte eine GLB-Datei bis 64 MB auswählen.");
@@ -269,7 +286,9 @@ async function startWebcamTracking() {
 }
 
 function openCamera() {
-  return navigator.mediaDevices.getUserMedia({ audio: false, video: {
+  return navigator.mediaDevices.getUserMedia({ audio: false, video: ECHO_SAFE ? {
+    facingMode: "user", width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15, max: 15 },
+  } : {
     facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30, max: 30 },
   } });
 }
@@ -277,20 +296,22 @@ function openCamera() {
 async function createFaceLandmarker() {
   const { FaceLandmarker, FilesetResolver } = await import("@mediapipe/tasks-vision");
   const vision = await FilesetResolver.forVisionTasks(WASM_PATH);
+  const preferredDelegate = ECHO_SAFE ? "CPU" : "GPU";
   const commonOptions = {
-    baseOptions: { modelAssetPath: MODEL_PATH, delegate: "GPU" }, runningMode: "VIDEO", numFaces: 1,
+    baseOptions: { modelAssetPath: MODEL_PATH, delegate: preferredDelegate }, runningMode: "VIDEO", numFaces: 1,
     minFaceDetectionConfidence: 0.55, minFacePresenceConfidence: 0.55, minTrackingConfidence: 0.55,
-    outputFaceBlendshapes: true, outputFacialTransformationMatrixes: false,
+    outputFaceBlendshapes: !ECHO_SAFE, outputFacialTransformationMatrixes: false,
   };
   try { return await FaceLandmarker.createFromOptions(vision, commonOptions); }
-  catch (gpuError) {
-    console.warn("GPU face tracking unavailable; using CPU.", gpuError);
+  catch (preferredError) {
+    if (ECHO_SAFE) throw preferredError;
+    console.warn("GPU face tracking unavailable; using CPU.", preferredError);
     return FaceLandmarker.createFromOptions(vision, { ...commonOptions, baseOptions: { modelAssetPath: MODEL_PATH, delegate: "CPU" } });
   }
 }
 
 async function prepareTracking() {
-  if (typeof Worker !== "undefined" && typeof createImageBitmap === "function" && typeof OffscreenCanvas !== "undefined") {
+  if (!ECHO_SAFE && typeof Worker !== "undefined" && typeof createImageBitmap === "function" && typeof OffscreenCanvas !== "undefined") {
     try {
       trackingClient = new TrackingClient(new Worker(`${import.meta.env.BASE_URL}tracking-worker.js`));
       await trackingClient.init(MODEL_PATH);
@@ -303,7 +324,7 @@ async function prepareTracking() {
     }
   }
   faceLandmarker = await createFaceLandmarker();
-  elements.trackingBackend.textContent = "Kompatibilitätsmodus";
+  elements.trackingBackend.textContent = ECHO_SAFE ? "Echo/Silk · CPU 10 Hz" : "Kompatibilitätsmodus";
 }
 
 function scheduleTracking() {
@@ -311,9 +332,8 @@ function scheduleTracking() {
   const tick = async () => {
     const started = performance.now();
     await updateTracking(started);
-    // Tracking measurements are capped at 20 Hz. Rendering keeps running at
-    // display refresh rate and interpolates between these measurements.
-    if (cameraStream) trackingTimer = setTimeout(tick, Math.max(0, 50 - (performance.now() - started)));
+    const interval = ECHO_SAFE ? 100 : 50;
+    if (cameraStream) trackingTimer = setTimeout(tick, Math.max(0, interval - (performance.now() - started)));
   };
   trackingTimer = setTimeout(tick, 0);
 }
@@ -332,7 +352,7 @@ async function updateTracking(now) {
     if (!response || generation !== trackingGeneration || elements.mouseMode.checked || document.hidden) return;
     const result = response.result;
     const landmarks = result.faceLandmarks?.[0];
-    latestFaceBlendshapes = result.faceBlendshapes?.[0]?.categories ?? [];
+    latestFaceBlendshapes = ECHO_SAFE ? [] : result.faceBlendshapes?.[0]?.categories ?? [];
     const estimatedPose = estimateEyePosition({
       landmarks, videoWidth, videoHeight, ipdMeters: frameCalibration.ipdMeters,
       horizontalFovDegrees: frameCalibration.horizontalFovDegrees, cameraOffsetY: frameCalibration.cameraOffsetY,
@@ -370,11 +390,15 @@ function stopTracking() {
 }
 
 function applyRenderQuality() {
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, Number(elements.renderQuality.value)));
+  const selected = Number(elements.renderQuality.value);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, ECHO_SAFE ? 0.5 : selected));
   resizeRenderer();
 }
 
 function renderFrame(now) {
+  if (ECHO_SAFE && now - lastEchoRenderTimestamp < ECHO_RENDER_INTERVAL_MS) return;
+  if (ECHO_SAFE) lastEchoRenderTimestamp = now;
+
   const deltaSeconds = Math.min((now - lastFrameTimestamp) / 1000, 0.1);
   lastFrameTimestamp = now;
 
@@ -385,7 +409,9 @@ function renderFrame(now) {
   camera.updateMatrixWorld(true);
   camera.projectionMatrix.makePerspective(frustum.left, frustum.right, frustum.top, frustum.bottom, frustum.near, frustum.far, camera.coordinateSystem);
   camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
-  if (sceneController.update({ ...calibration, elapsedSeconds: now / 1000, faceBlendshapes: latestFaceBlendshapes })) renderer.shadowMap.needsUpdate = true;
+  if (sceneController.update({ ...calibration, elapsedSeconds: now / 1000, faceBlendshapes: latestFaceBlendshapes }) && renderer.shadowMap.enabled) {
+    renderer.shadowMap.needsUpdate = true;
+  }
   renderer.render(scene, camera);
   if (now - lastMetricsTimestamp >= 200) {
     updateMetrics(eye);
