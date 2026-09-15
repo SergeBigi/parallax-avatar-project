@@ -82,6 +82,21 @@ test("near and far features have different horizontal and vertical parallax with
   assert.ok(doll.matrixWorld.equals(originalTransform), "only the viewpoint changes");
 });
 
+test("positive avatar depth places Test-Chan in front of the display and makes it grow on approach", () => {
+  const scene = new THREE.Scene();
+  const room = createRoomScene(scene);
+  room.update({ screenWidth: 0.286, screenHeight: 0.191, roomDepth: 0.45, avatarDepth: 0.02 });
+  const avatar = scene.getObjectByName("Test-Chan avatar");
+  assert.ok(Math.abs(avatar.position.z - 0.02) < 1e-12);
+
+  const left = new THREE.Vector3(-0.03, 0, 0.02);
+  const right = new THREE.Vector3(0.03, 0, 0.02);
+  const widthAt = (camera) => right.clone().project(camera).x - left.clone().project(camera).x;
+  const nearEye = cameraAt({ x: 0, y: 0, z: 0.35 });
+  const farEye = cameraAt({ x: 0, y: 0, z: 0.9 });
+  assert.ok(widthAt(nearEye) > widthAt(farEye), "front-of-screen avatar grows as viewer approaches");
+});
+
 test("hiding the doll preserves the room and changing room depth refreshes static shadows", () => {
   const scene = new THREE.Scene();
   const room = createRoomScene(scene);
