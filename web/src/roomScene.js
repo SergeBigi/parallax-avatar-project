@@ -4,7 +4,7 @@ import { createImportedRoom } from "./importedRoom.js";
 import { createRoomStyles } from "./roomStyles.js";
 import { createTestChanAvatar } from "./testChanAvatar.js";
 
-const DYNAMIC_SHADOW_INTERVAL_SECONDS = 1 / 15;
+const DYNAMIC_SHADOW_INTERVAL_SECONDS = 1 / 10;
 
 /** A stationary miniature room, with its open front on the display at z = 0. */
 export function createRoomScene(
