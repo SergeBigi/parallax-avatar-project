@@ -66,3 +66,23 @@ test("transfer failure closes the bitmap and clears the request", async () => {
   assert.ok(closed && worker.terminated);
   assert.equal(client.pending, null);
 });
+
+test("tracking is capped without queueing unnecessary camera captures", async () => {
+  let captures = 0;
+  const { client, reply } = setup({
+    minIntervalMs: 50,
+    capture: async () => { captures += 1; return { close() {} }; },
+  });
+  const first = client.detect({}, 100);
+  await Promise.resolve();
+  reply({ type: "result", result: { faceLandmarks: [] } });
+  await first;
+  assert.equal(await client.detect({}, 120), null);
+  assert.equal(captures, 1);
+  const second = client.detect({}, 151);
+  await Promise.resolve();
+  reply({ type: "result", result: { faceLandmarks: [] } });
+  await second;
+  assert.equal(captures, 2);
+  client.close();
+});
