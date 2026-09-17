@@ -125,6 +125,12 @@ button {
   font-weight: 650;
 }
 
+.diagnostic-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 .button:hover,
 .icon-button:hover {
   border-color: rgb(109 241 212 / 60%);

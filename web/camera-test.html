@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Minimaler Kameratest für Echo Show, Silk und andere Browser." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>ParallaxView Kamera-Test</title>
+  </head>
+  <body>
+    <main class="test-shell">
+      <header class="test-header">
+        <div>
+          <span class="eyebrow">ParallaxView Diagnose</span>
+          <h1>Minimaler Kamera-Test</h1>
+          <p>Diese Seite lädt weder 3D-Szene noch Avatar oder MediaPipe. Sie prüft nur, ob der Browser einen Kamerastream an ein normales HTML-Video übergibt.</p>
+        </div>
+        <a class="back-link" href="./">Zurück zur App</a>
+      </header>
+
+      <section class="summary-card" aria-labelledby="result-title">
+        <div class="result-heading">
+          <div>
+            <span class="status-dot" id="status-dot" aria-hidden="true"></span>
+            <h2 id="result-title">Noch nicht gestartet</h2>
+          </div>
+          <span class="result-code" id="result-code">BEREIT</span>
+        </div>
+        <p id="result-detail">Tippe auf „Kamera testen“. Der Browser fragt eventuell nach der Kameraberechtigung.</p>
+      </section>
+
+      <section class="test-grid">
+        <article class="video-card">
+          <video id="camera-preview" autoplay muted playsinline aria-label="Direkte Kameravorschau"></video>
+          <div class="video-placeholder" id="video-placeholder">Noch kein Videostream</div>
+          <div class="video-metrics" id="video-metrics">–</div>
+        </article>
+
+        <article class="controls-card">
+          <h2>Teststeuerung</h2>
+          <p>Der Test fordert ausschließlich Video an. Mikrofonzugriff ist ausdrücklich deaktiviert.</p>
+          <div class="button-row">
+            <button class="button button-primary" id="start-button" type="button">Kamera testen</button>
+            <button class="button" id="stop-button" type="button" disabled>Stream stoppen</button>
+          </div>
+          <div class="button-row secondary-actions">
+            <button class="button button-small" id="refresh-button" type="button">Geräte neu prüfen</button>
+            <button class="button button-small" id="copy-button" type="button">Bericht kopieren</button>
+          </div>
+          <p class="privacy-note">Das Kamerabild bleibt lokal im Browser. Der kopierbare Bericht enthält kein Bild und keine Geräte-ID.</p>
+        </article>
+      </section>
+
+      <section class="details-grid">
+        <article class="detail-card">
+          <h2>Browser-Funktionen</h2>
+          <dl id="capability-list"></dl>
+        </article>
+        <article class="detail-card">
+          <h2>Gefundene Mediengeräte</h2>
+          <p class="detail-hint">Vor der Freigabe dürfen Kameranamen leer sein. Entscheidend ist, ob nach dem Start ein Videostream erscheint.</p>
+          <ul id="device-list"><li>Noch nicht geprüft</li></ul>
+        </article>
+      </section>
+
+      <section class="log-card">
+        <div class="log-heading">
+          <h2>Diagnosebericht</h2>
+          <span>Exakte Browserfehler werden unverändert protokolliert.</span>
+        </div>
+        <pre id="diagnostic-log" aria-live="polite"></pre>
+      </section>
+    </main>
+    <script type="module" src="/src/cameraTest.js"></script>
+  </body>
+</html>

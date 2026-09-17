@@ -12,6 +12,18 @@ Browser prototype of the TheParallaxView idea for a fixed Windows display and a 
 
 The room depth, selected tracking eye and calibration values are stored locally in the browser.
 
+## Minimal camera diagnostic
+
+Open `camera-test.html` (or use **Kamera-Test** in the app header) to test the
+browser camera without loading Three.js, the avatar, MediaPipe or a tracking
+worker. This is intended for constrained devices such as Echo Show with Silk.
+
+The diagnostic checks the secure-context state, `mediaDevices`,
+`enumerateDevices()` and the camera permission, then requests only
+`getUserMedia({ video: true, audio: false })`. A successful stream is rendered
+directly in a normal HTML `<video>`. Browser error name and message, public track
+settings and a privacy-safe device summary can be copied from the page.
+
 ## Test-Chan asset
 
 The app expects the advanced Test-Chan v1.3 VRM here:
